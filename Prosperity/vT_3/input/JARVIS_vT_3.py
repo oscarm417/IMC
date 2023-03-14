@@ -58,8 +58,8 @@ class Trader:
         buy_volume = 0
         sell_volume = 0
         new_orders: list[Order] = []
-        buy_order_layout = self.calculate_poisson_distribution(avail_buy_orders, 1)
-        sell_order_layout = self.calculate_poisson_distribution(avail_sell_orders, 1)
+        buy_order_layout = self.calculate_poisson_distribution(avail_buy_orders, 0.8)
+        sell_order_layout = self.calculate_poisson_distribution(avail_sell_orders, 0.8)
         
         if inventory_adj_bid >= smart_price_bid:
             for bid_difference in range(abs(int(inventory_adj_bid) - int(smart_price_bid))):
@@ -177,6 +177,7 @@ class Trader:
         """
         if product == "PEARLS" or "BANANAS":
             inventory_limit = 20
+        
         order_depth: OrderDepth = state.order_depths[product]   # Retrieve the Order Depth containing all the market BUY and SELL orders for PEARLS
         lob_buy_volume_total = m.fabs(m.fsum(order_depth.buy_orders.values()))       # Returns the absolute value of the aggregated buy order volumes of the orderbook (lob) --> positive
         lob_sell_volume_total = m.fabs(m.fsum(order_depth.sell_orders.values()))     # Returns the absolute value of the aggregated sell order volumes of the orderbook (lob) --> positive
