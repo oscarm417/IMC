@@ -209,7 +209,7 @@ class Trader:
         This price will be used to manage the inventory of the strategy. The parameter (T-t) from the formula will not be used as it is assumed that positions will be sold at the end of the time period anyway.
         Also, the parameter gamma will have a value of gamma = ?, while Avellaneda & Stoikov provide multiple ideas of the value gamma can have. Approaching zero would be a trader not caring about inventory risk, playing both sides of the mid price the same.
         On the other hand, a value of 1 would be a trader who would go great lengths to balance his portfolio.
-        The values provided for the return probability standard deviation are the historical values calculated from the historical smart prices
+        The values provided for the return probability standard deviation are the historical values calculated from the historical smart prices.
         """
         reservation_price = smart_price
         if product == "PEARLS":
