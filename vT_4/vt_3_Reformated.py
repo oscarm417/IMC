@@ -13,8 +13,8 @@ class Trader:
                                    'BANANAS':{'gamma':0.34375,'desired_inventory':0,'spread_size':3,'inventory_limit': 20,'default_vol':1.46038979005149E-04,'mid_price_history':[],'mid_price_moving_average':[]}
                                    }
         
-        self.vol_look_back_period = 75
-        self.bias_look_back_period = 75
+        self.vol_look_back_period = float('inf')
+        self.bias_look_back_period = float('inf') #use float('inf') if you dont want this used
         self.labda  = 0.8
     
     def module_1_order_tapper(self, lob_buy_strikes, lob_sell_strikes, lob_buy_volume_per_strike, lob_sell_volume_per_strike, initial_inventory, inventory_limit, product, new_bid, new_ask, smart_price):
@@ -297,9 +297,10 @@ class Trader:
         lob_buy_volume_total,
         lob_sell_volume_total) = market_variables
 
-        
-        if lob_buy_volume_total > 0 and lob_sell_volume_total > 0:
+        avail_buy_orders = inventory_limit - initial_inventory
+        avail_sell_orders = inventory_limit + initial_inventory
 
+        if lob_buy_volume_total > 0 and lob_sell_volume_total > 0:
             #CALC SMART PRICE
             smart_price = self.calculate_smart_price(lob_average_buy, 
                                                     lob_average_sell, 
@@ -321,8 +322,16 @@ class Trader:
                                                                                                  smart_price_ask,
                                                                                                  smart_price
                                                                                                  )
+                        
             #AVAILABLE BUYS AND SELLS
-            avail_buy_orders, avail_sell_orders = self.calculate_available_buy_and_sell(initial_inventory,initial_inventory,mod_1_buy_volume,mod_1_sell_volume)
+            if (1 * inventory_limit) - initial_inventory - mod_1_buy_volume < 0:
+                    avail_buy_orders = 0
+            else:
+                avail_buy_orders = round(1 * inventory_limit) - initial_inventory - mod_1_buy_volume
+            if (1 * inventory_limit) + initial_inventory - mod_1_sell_volume < 0:
+                avail_sell_orders = 0
+            else:
+                avail_sell_orders = round(1 * inventory_limit) + initial_inventory - mod_1_sell_volume
 
             current_inventory = initial_inventory + mod_1_buy_volume - mod_1_sell_volume
             reservation_price = self.calculate_reservation_price(product,
@@ -340,7 +349,9 @@ class Trader:
                                                                                                avail_buy_orders, 
                                                                                                avail_sell_orders
                                                                                                )
-        return mod_1_new_orders + mod_2_new_orders
+            return mod_1_new_orders + mod_2_new_orders
+        else: 
+            return []
     def run(self, state: TradingState) -> Dict[str, List[Order]]:
         """
         Takes all buy and sell orders for all symbols as an input,
