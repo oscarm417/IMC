@@ -1,19 +1,17 @@
 from typing import Dict, List
 from datamodel import OrderDepth, TradingState, Order
 import math as m
-import numpy as np 
 import statistics as stat
 
 
 class Trader:
 
     def __init__(self):
-        self.product_parameters = {'PEARLS':{'gamma':0.4,'desired_inventory':0,'spread_size':3,'inventory_limit': 20,'default_vol':7.38812499156771E-05,'mid_price_history':[],'mid_price_moving_average':[]},
-                                   'BANANAS':{'gamma':0.34375,'desired_inventory':0,'spread_size':3,'inventory_limit': 20,'default_vol':1.46038979005149E-04,'mid_price_history':[],'mid_price_moving_average':[]}
-                                   }
+        self.product_parameters = {'PEARLS':{'gamma':0.4,'desired_inventory':0,'spread_size':3,'inventory_limit': 20,'default_vol':7.38812499156771E-05,'smart_price_history':[],'smart_price_moving_average':[],'percentage_change_history':[],'perc_stdev_history':[]},
+                                    'BANANAS':{'gamma':0.34375,'desired_inventory':0,'spread_size':3,'inventory_limit': 20,'default_vol':1.46038979005149E-04,'smart_price_history':[],'smart_price_moving_average':[],'percentage_change_history':[],'perc_stdev_history':[]}
+                                    }
         
-        self.vol_look_back_period = float('inf')
-        self.bias_look_back_period = float('inf') #use float('inf') if you dont want this used
+        self.look_back_period = 30 #use float('inf') if you dont want this used
         self.labda  = 0.8
     
     def module_1_order_tapper(self, lob_buy_strikes, lob_sell_strikes, lob_buy_volume_per_strike, lob_sell_volume_per_strike, initial_inventory, inventory_limit, product, new_bid, new_ask, smart_price):
@@ -40,7 +38,6 @@ class Trader:
                     #print("BUY ", buy_volume, "x ", product, " @ ", strike)
                     buy_volume_total += buy_volume
                     break
-
         
         for strike in reversed(lob_buy_strikes):
             if strike > new_bid:       #  smart_price?
@@ -70,7 +67,7 @@ class Trader:
         buy_order_layout = self.calculate_poisson_distribution(avail_buy_orders, self.labda)
         sell_order_layout = self.calculate_poisson_distribution(avail_sell_orders, self.labda)
         
-        if inventory_adj_bid >= smart_price_bid:
+        if inventory_adj_bid > smart_price_bid:
             for bid_difference in range(abs(int(inventory_adj_bid) - int(smart_price_bid))):
                 old_value = buy_order_layout.pop(0)
                 if len(buy_order_layout) > 0:
@@ -78,21 +75,18 @@ class Trader:
                 else:
                     buy_order_layout = [old_value]
 
-
-            #TODO Reduction is done by 1 unit? how about 10% increments ? 
             for idx, bid_quantity in enumerate(buy_order_layout):
                 if bid_quantity == 0: 
                     break
                 new_orders.append(Order(product, (smart_price_bid - idx), bid_quantity))
                 buy_volume += bid_quantity
                 
-        elif inventory_adj_bid < smart_price_bid:
+        elif inventory_adj_bid <= smart_price_bid:
             for idx, bid_quantity in enumerate(buy_order_layout):
                 if bid_quantity == 0: 
                     break
                 new_orders.append(Order(product, (inventory_adj_bid - idx), bid_quantity))
                 buy_volume += bid_quantity
-        
         
         if inventory_adj_ask < smart_price_ask:
             for ask_difference in range(abs(int(smart_price_ask) - int(inventory_adj_ask))):
@@ -114,10 +108,6 @@ class Trader:
                 new_orders.append(Order(product, (inventory_adj_ask + idx), -ask_quantity))        
                 sell_volume += ask_quantity
         
-        #if product == "BANANAS":
-        #    print(buy_order_layout)
-        #    print(sell_order_layout)
-            
         return (new_orders, buy_volume, sell_volume)
 
     def calculate_bid_ask(self, price: float, max_spread_width: int) -> int:
@@ -171,7 +161,38 @@ class Trader:
         Calculates the "Smart Price" described in "Machine Learning for Market Microstructure and High Frequency Trading" - Michael Kearns
         """
         smart_price = ((lob_average_buy *  lob_sell_quantity) + (lob_average_sell * lob_buy_quantity) ) / (lob_buy_quantity + lob_sell_quantity)
+        
         return smart_price
+    
+    def save_price_data_and_vol(self, product: str, smart_price: float):
+        
+        self.product_parameters[product]['smart_price_history'].append(smart_price)
+        
+        if len(self.product_parameters[product]['smart_price_history']) > 1 :
+            if len(self.product_parameters[product]['smart_price_history']) > self.look_back_period:
+                del self.product_parameters[product]['smart_price_history'][0]
+                del self.product_parameters[product]['percentage_change_history'][0]
+                del self.product_parameters[product]['perc_stdev_history'][0]
+                del self.product_parameters[product]['smart_price_moving_average'][0]
+            
+            percentage_change = m.log(self.product_parameters[product]['smart_price_history'][-1] / self.product_parameters[product]['smart_price_history'][-2])
+            self.product_parameters[product]['percentage_change_history'].append(percentage_change)
+            perc_standard_deviation = stat.stdev([x for x in self.product_parameters[product]['percentage_change_history']])
+            self.product_parameters[product]['perc_stdev_history'].append(perc_standard_deviation)
+            
+            k = 2 / (len(self.product_parameters[product]['smart_price_history']) + 1)
+            moving_average = (smart_price * k) + self.product_parameters[product]['smart_price_moving_average'][-1] * (1 - k)
+            self.product_parameters[product]['smart_price_moving_average'].append(moving_average)
+            
+        elif len(self.product_parameters[product]['smart_price_history']) <= 1 :
+            percentage_change = 0
+            perc_standard_deviation = 0
+            moving_average = smart_price
+            self.product_parameters[product]['percentage_change_history'].append(percentage_change)
+            self.product_parameters[product]['perc_stdev_history'].append(perc_standard_deviation)
+            self.product_parameters[product]['smart_price_moving_average'].append(moving_average)
+            
+        return
     
     def initialize(self, state: TradingState, product):
         """
@@ -196,12 +217,7 @@ class Trader:
         best_bid = max(order_depth.buy_orders.keys())
         mid_price = (best_ask + best_bid) / 2 
         current_timestamp = state.timestamp
-        
-        self.product_parameters[product]['mid_price_history'].append(mid_price)
-        if len(self.product_parameters[product]['mid_price_history']) > self.bias_look_back_period:
-            average_price = np.mean(self.product_parameters[product]['mid_price_history'][-self.bias_look_back_period])
-            self.product_parameters[product]['mid_price_moving_average'].append(average_price)
-    
+
         return (lob_average_buy, lob_average_sell, lob_buy_quantity, lob_sell_quantity, lob_buy_strikes, 
                 lob_sell_strikes, lob_buy_volume_per_strike, lob_sell_volume_per_strike, inventory_limit,
                 lob_buy_volume_total, lob_sell_volume_total)
@@ -215,22 +231,15 @@ class Trader:
         The values provided for the return probability standard deviation are the historical values calculated from the historical smart prices.
         """
         
-        #Dyanmic Vol or Default vol if not enought values
-        look_back_period = self.vol_look_back_period
-        product_specific_vol =  self.product_parameters[product]['default_vol'] 
-        price_history = self.product_parameters[product]['mid_price_history']
-        vol =  np.std(price_history[-look_back_period:])/10000  if len(price_history) >= look_back_period else product_specific_vol
-
-        if len(price_history) >= look_back_period:
-            print('product |', vol)
-        abs_volatility = vol* smart_price 
+        perc_volatility =  self.product_parameters[product]['perc_stdev_history'][-1] if len(self.product_parameters[product]['smart_price_history']) >= self.look_back_period else self.product_parameters[product]['default_vol']
+        abs_volatility = perc_volatility* smart_price 
         reservation_price = smart_price
         reservation_price = smart_price - ((current_inventory - desired_inventory) * gamma * (abs_volatility)**2)
-
         
         return reservation_price
         
     def calculate_available_buy_and_sell(self, inventory_limit,initial_inventory,mod_1_buy_volume,mod_1_sell_volume):
+        
         if (1 * inventory_limit) - initial_inventory - mod_1_buy_volume < 0:
             avail_buy_orders = 0
         else:
@@ -241,7 +250,7 @@ class Trader:
             avail_sell_orders = round(1 * inventory_limit) + initial_inventory - mod_1_sell_volume
         
         return avail_buy_orders, avail_sell_orders
-            
+        
     def calculate_poisson_distribution(self, available_orders: int, labda: float) -> list:
         """
         Calculates a Poisson distribution with lambda = labda and puts the availabla orders into the different lots according to the distribution.
@@ -262,10 +271,11 @@ class Trader:
         return levels
     
     def update_target_inventory(self,product):
-        
-        look_back_period = self.bias_look_back_period
-        moving_average_price = self.product_parameters[product]['mid_price_moving_average']
-        price_history = self.product_parameters[product]['mid_price_history']
+        pass
+        '''
+        look_back_period = self.look_back_period
+        moving_average_price = self.product_parameters[product]['smart_price_moving_average']
+        price_history = self.product_parameters[product]['smart_price_history']
         product_limit = self.product_parameters[product]['inventory_limit']
 
         if len(moving_average_price) >= look_back_period :
@@ -276,11 +286,12 @@ class Trader:
             adjusted_desired_inventory = -product_limit + units 
             print(product,'| adjusted_inventory',adjusted_desired_inventory,"| percent above ma", percent_dec_above,'|')
             self.product_parameters[product]['desired_inventory'] = adjusted_desired_inventory
+        '''
 
-    def trade_logic(self, product:str, state: TradingState ,market_variables: list):
+    def trade_logic(self, product:str, state: TradingState, market_variables: list):
         #initializing variables 
         gamma = self.product_parameters[product]['gamma']
-        self.update_target_inventory(product)
+        #self.update_target_inventory(product)
         desired_inventory = self.product_parameters[product]['desired_inventory']
         spread_size = self.product_parameters[product]['spread_size']
         initial_inventory = state.position.get(product,0)  
@@ -306,33 +317,31 @@ class Trader:
                                                     lob_average_sell, 
                                                     lob_buy_quantity, 
                                                     lob_sell_quantity)
+            #GET PRICE DATA AND CALC VOL
+            self.save_price_data_and_vol(product, smart_price)
             
+            if product == 'BANANAS':
+                print(self.product_parameters[product]['smart_price_moving_average'][-1])
+                
             #CALC BID
             smart_price_bid, smart_price_ask = self.calculate_bid_ask(smart_price, spread_size) 
             
             #MOD1 BUY AND SELL ORDERS 
             mod_1_new_orders, mod_1_buy_volume, mod_1_sell_volume = self.module_1_order_tapper(lob_buy_strikes, 
-                                                                                                 lob_sell_strikes, 
-                                                                                                 lob_buy_volume_per_strike, 
-                                                                                                 lob_sell_volume_per_strike, 
-                                                                                                 initial_inventory, 
-                                                                                                 inventory_limit, 
-                                                                                                 product, 
-                                                                                                 smart_price_bid, 
-                                                                                                 smart_price_ask,
-                                                                                                 smart_price
-                                                                                                 )
+                                                                                                lob_sell_strikes, 
+                                                                                                lob_buy_volume_per_strike, 
+                                                                                                lob_sell_volume_per_strike, 
+                                                                                                initial_inventory, 
+                                                                                                inventory_limit, 
+                                                                                                product, 
+                                                                                                smart_price_bid, 
+                                                                                                smart_price_ask,
+                                                                                                smart_price
+                                                                                                )
                         
             #AVAILABLE BUYS AND SELLS
-            if (1 * inventory_limit) - initial_inventory - mod_1_buy_volume < 0:
-                    avail_buy_orders = 0
-            else:
-                avail_buy_orders = round(1 * inventory_limit) - initial_inventory - mod_1_buy_volume
-            if (1 * inventory_limit) + initial_inventory - mod_1_sell_volume < 0:
-                avail_sell_orders = 0
-            else:
-                avail_sell_orders = round(1 * inventory_limit) + initial_inventory - mod_1_sell_volume
-
+            avail_buy_orders, avail_sell_orders = self.calculate_available_buy_and_sell(inventory_limit, initial_inventory, mod_1_buy_volume, mod_1_sell_volume)
+            
             current_inventory = initial_inventory + mod_1_buy_volume - mod_1_sell_volume
             reservation_price = self.calculate_reservation_price(product,
                                                                 current_inventory,
@@ -342,16 +351,22 @@ class Trader:
             #RESERVATION ADJ. BID, ASK
             inventory_adj_bid, inventory_adj_ask = self.calculate_bid_ask(reservation_price, spread_size)
             mod_2_new_orders, mod_2_buy_volume, mod_2_sell_volume = self.module_2_market_maker(product, 
-                                                                                               inventory_adj_bid, 
-                                                                                               inventory_adj_ask, 
-                                                                                               smart_price_bid, 
-                                                                                               smart_price_ask, 
-                                                                                               avail_buy_orders, 
-                                                                                               avail_sell_orders
-                                                                                               )
+                                                                                                inventory_adj_bid, 
+                                                                                                inventory_adj_ask, 
+                                                                                                smart_price_bid, 
+                                                                                                smart_price_ask, 
+                                                                                                avail_buy_orders, 
+                                                                                                avail_sell_orders
+                                                                                                )
             return mod_1_new_orders + mod_2_new_orders
         else: 
             return []
+        
+        
+        
+        
+        
+        
     def run(self, state: TradingState) -> Dict[str, List[Order]]:
         """
         Takes all buy and sell orders for all symbols as an input,
@@ -363,7 +378,7 @@ class Trader:
             market_variables = self.initialize(state, product)
             #Reading Inventory
             initial_inventory = state.position.get(product,0)                
-            print(initial_inventory)
+            #print(initial_inventory)
             total_transmittable_orders[product] = self.trade_logic(product,state,market_variables)
 
         return total_transmittable_orders
