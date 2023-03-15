@@ -3,7 +3,6 @@ from datamodel import OrderDepth, TradingState, Order
 import math as m
 import numpy as np 
 import statistics as stat
-from collections import defaultdict
 
 
 class Trader:
