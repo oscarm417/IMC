@@ -257,7 +257,7 @@ class Trader:
                 idx = len(levels) - next(x for x, value in enumerate(reversed(levels)) if value > 0) - 1
                 levels[idx] -= 1
             if sum(levels) < available_orders:
-                levels[1] += 1
+                levels[0] += 1
         return levels
     
     def update_target_inventory(self,product):
