@@ -39,9 +39,10 @@ class Trader:
                     new_orders.append(Order(product, strike, buy_volume))
                     #print("BUY ", buy_volume, "x ", product, " @ ", strike)
                     buy_volume_total += buy_volume
+                    break
 
         
-        for strike in lob_buy_strikes:
+        for strike in reversed(lob_buy_strikes):
             if strike > new_bid:       #  smart_price?
                 sell_volume = lob_buy_volume_per_strike[lob_buy_strikes.index(strike)]
                 if abs(initial_inventory - sell_volume -sell_volume_total) <= inventory_limit:
@@ -49,10 +50,11 @@ class Trader:
                     #print("SELL ", -sell_volume, "x ", product, " @ ", strike)
                     sell_volume_total += sell_volume
                 else:
-                    sell_volume = abs(initial_inventory + inventory_limit + sell_volume_total)
+                    sell_volume = abs(initial_inventory + inventory_limit - sell_volume_total)
                     new_orders.append(Order(product, strike, -sell_volume))
                     #print("SELL ", -sell_volume, "x ", product, " @ ", strike)
                     sell_volume_total += sell_volume
+                    break
 
         return (new_orders, buy_volume_total, sell_volume_total)
 
