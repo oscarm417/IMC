@@ -270,7 +270,7 @@ class Trader:
                 levels[0] += 1
         return levels
     
-    def update_target_inventory(self,product):
+    def update_target_inventory(self, product):
         pass
         '''
         look_back_period = self.look_back_period
@@ -321,7 +321,7 @@ class Trader:
             self.save_price_data_and_vol(product, smart_price)
             
             if product == 'BANANAS':
-                print(self.product_parameters[product]['smart_price_moving_average'][-1])
+                print(self.product_parameters[product]['smart_price_moving_average'][-1]) # prints the current exponential moving average
                 
             #CALC BID
             smart_price_bid, smart_price_ask = self.calculate_bid_ask(smart_price, spread_size) 
