@@ -206,7 +206,6 @@ class Trader:
                 lob_sell_strikes, lob_buy_volume_per_strike, lob_sell_volume_per_strike, inventory_limit,
                 lob_buy_volume_total, lob_sell_volume_total)
     
-
     def calculate_reservation_price(self, product: str, current_inventory: int, desired_inventory: int, smart_price: float, gamma: float) -> float:
         """
         Calculates the Reservation price as defined by "High-frequency trading in a limit order book" - Marco Avellaneda & Sasha Stoikov.
@@ -230,7 +229,7 @@ class Trader:
 
         
         return reservation_price
-        
+    
     def calculate_available_buy_and_sell(self, inventory_limit,initial_inventory,mod_1_buy_volume,mod_1_sell_volume):
         if (1 * inventory_limit) - initial_inventory - mod_1_buy_volume < 0:
             avail_buy_orders = 0
@@ -242,7 +241,7 @@ class Trader:
             avail_sell_orders = round(1 * inventory_limit) + initial_inventory - mod_1_sell_volume
         
         return avail_buy_orders, avail_sell_orders
-            
+    
     def calculate_poisson_distribution(self, available_orders: int, labda: float) -> list:
         """
         Calculates a Poisson distribution with lambda = labda and puts the availabla orders into the different lots according to the distribution.
