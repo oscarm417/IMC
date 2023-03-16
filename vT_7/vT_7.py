@@ -12,14 +12,14 @@ class Trader:
                                     'inventory_limit': 20,'default_vol':7.38812499156771E-05,
                                     'smart_price_history':[],'smart_price_moving_average':[],
                                     'percentage_change_history':[],'perc_stdev_history':[],
-                                    'lower_inventory_limit': 20, 'upper_inventory_limit': 20},
+                                    'lower_inventory_limit': -20, 'upper_inventory_limit': 20},
 
                                   'BANANAS':{
                                     'gamma':0.34375,'desired_inventory':0,'spread_size':3,
                                     'inventory_limit': 20,'default_vol':1.46038979005149E-04,
                                     'smart_price_history':[],'smart_price_moving_average':[],
                                     'percentage_change_history':[],'perc_stdev_history':[],
-                                    'lower_inventory_limit': 20, 'upper_inventory_limit': 20
+                                    'lower_inventory_limit': -20, 'upper_inventory_limit': 20
                                     }
                                 }
         
@@ -257,10 +257,10 @@ class Trader:
             avail_buy_orders = 0
         else:
             avail_buy_orders = min(upper_bound,inventory_limit) - initial_inventory - mod_1_buy_volume
-        if min(lower_bound, inventory_limit) + initial_inventory - mod_1_sell_volume < 0:
+        if max(lower_bound, -inventory_limit) - initial_inventory - mod_1_sell_volume < 0:
             avail_sell_orders = 0
         else:
-            avail_sell_orders = min(lower_bound,inventory_limit) + initial_inventory - mod_1_sell_volume
+            avail_sell_orders = max(lower_bound, -inventory_limit) - initial_inventory - mod_1_sell_volume
         
         return round(avail_buy_orders), round(avail_sell_orders)
         
