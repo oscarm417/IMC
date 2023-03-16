@@ -1,8 +1,8 @@
 import pandas as pd
 
 df = pd.DataFrame()
-df_bananas = pd.DataFrame(columns=['day', 'timestamp', 'product', 'bid_price', 'bid_volume', 'ask_price', 'ask_volume'])
-df_pearls = pd.DataFrame(columns=['day', 'timestamp', 'product', 'bid_price', 'bid_volume', 'ask_price', 'ask_volume'])
+df_bananas = pd.DataFrame(columns=['day', 'timestamp', 'product', 'average_bid', 'total_bid_volume', 'average_ask', 'total_ask_volume'])
+df_pearls = pd.DataFrame(columns=['day', 'timestamp', 'product', 'average_bid', 'total_bid_volume', 'average_ask', 'total_ask_volume'])
 
 
 
@@ -17,8 +17,8 @@ total_ask_volume = []
 for idx, row in df.iterrows():
     bid_volume = int(row['bid_volume_1']) + int(row['bid_volume_2']) + int(row['bid_volume_3'])
     ask_volume = int(row['ask_volume_1']) + int(row['ask_volume_2']) + int(row['ask_volume_3'])
-    bid_price = (int(row['bid_volume_1']) * int(row['bid_price_1']) + int(row['bid_volume_2']) * int(row['bid_price_2']) + int(row['bid_volume_3']) * int(row['bid_price_3'])) / bid_volume
-    ask_price = (int(row['ask_volume_1']) * int(row['ask_price_1']) + int(row['ask_volume_2']) * int(row['ask_price_2']) + int(row['ask_volume_3']) * int(row['ask_price_3'])) / ask_volume
+    bid_price = round((int(row['bid_volume_1']) * int(row['bid_price_1']) + int(row['bid_volume_2']) * int(row['bid_price_2']) + int(row['bid_volume_3']) * int(row['bid_price_3'])) / bid_volume, 2)
+    ask_price = round((int(row['ask_volume_1']) * int(row['ask_price_1']) + int(row['ask_volume_2']) * int(row['ask_price_2']) + int(row['ask_volume_3']) * int(row['ask_price_3'])) / ask_volume, 2)
     average_bid.append(bid_price)
     average_ask.append(ask_price)
     total_bid_volume.append(bid_volume)
@@ -32,13 +32,6 @@ df['average_bid'] = average_bid
 df['total_bid_volume'] = total_bid_volume
 df['average_ask'] = average_ask
 df['total_ask_volume'] = total_ask_volume
-
-
-df.insert(loc=-1, column='average_bid', value=average_bid)
-df.insert(loc=-1, column='total_bid_volume', value=total_bid_volume)
-df.insert(loc=-1, column='average_ask', value=average_ask)
-df.insert(loc=-1, column='total_ask_volume', value=total_ask_volume)
-
 
 for idx, row in df.iterrows():
     if row['product'] == 'BANANAS':

@@ -76,7 +76,7 @@ def estimate(T):
     Q=T1[:,0:(n_imb*n_spread)]
     R1=T1[:,(n_imb*n_spread):]
 
-    K=np.array([-1, -0.5, 0.5, 1])
+    K=np.array([-0.01, -0.005, 0.005, 0.01])
     move_counts=T[(T['dM']!=0)].pivot_table(index=['spread','imb_bucket'], 
                      columns=['next_spread', 'next_imb_bucket'], 
                      values='time',
@@ -101,11 +101,11 @@ def plot_Gstar(ticker,G1,B,T):
     G4=G3+np.dot(np.dot(np.dot(B,B),B),G1)
     G5=G4+np.dot(np.dot(np.dot(np.dot(B,B),B),B),G1)
     G6=G5+np.dot(np.dot(np.dot(np.dot(np.dot(B,B),B),B),B),G1)
-    plt.plot(imb,np.linspace(-1,1,n_imb)*0,label='Mid adj',marker='o')
-    plt.plot(imb,np.linspace(-1,1,n_imb),label='Weighted mid adj',marker='o')
+    plt.plot(imb,np.linspace(-0.05,0.05,n_imb)*0,label='Mid adj',marker='o')
+    plt.plot(imb,np.linspace(-0.05,0.05,n_imb),label='Weighted mid adj',marker='o')
     for i in range(0,n_spread):
         plt.plot(imb,G6[(0+i*n_imb):(n_imb+i*n_imb)],label="spread = "+str(i+1)+" tick adj",marker='o')
-    plt.ylim(-1,1)
+    plt.ylim(-0.05,0.05)
     plt.legend(loc='upper left')
     plt.title(ticker+' adjustments')
     plt.xlabel('Imbalance')
@@ -113,8 +113,8 @@ def plot_Gstar(ticker,G1,B,T):
     return G6
 
 
-n_imb=5
-n_spread=10
+n_imb=10
+n_spread=5
 dt=1
 ticker='bananas'
 data=get_df(ticker) 
