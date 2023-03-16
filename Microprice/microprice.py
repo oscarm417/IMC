@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 #%matplotlib inline
 
 def get_df(ticker):
-    file1='%s_20110301_20110331.csv'%str(ticker)
+    file1='orderbook_data_%s.csv'%str(ticker)
     df=pd.read_csv(file1)
     df.columns = ['date','time','bid','bs','ask','as']
     df = df.dropna()
@@ -20,11 +20,6 @@ def get_df(ticker):
     df['wmid']=df['ask'].astype(float)*df['imb']+df['bid'].astype(float)*(1-df['imb'])
     return df
 
-data=get_df('BAC')[0:100]
-data.head()
-
-data[['bid','ask','mid','wmid']].plot()
-
 def prep_data_sym(T,n_imb,dt,n_spread):
     spread=T.ask-T.bid
     ticksize=np.round(min(spread.loc[spread>0])*100)/100
@@ -36,7 +31,7 @@ def prep_data_sym(T,n_imb,dt,n_spread):
     T = T.loc[(T.spread <= n_spread*ticksize) & (T.spread>0)]
     T['imb']=T['bs']/(T['bs']+T['as'])
     #discretize imbalance into percentiles
-    T['imb_bucket'] = pd.qcut(T['imb'], n_imb, labels=False)
+    T['imb_bucket'] = pd.qcut(T['imb'], n_imb, labels=False, duplicates='drop')
     T['next_mid']=T['mid'].shift(-dt)
     #step ahead state variables
     T['next_spread']=T['spread'].shift(-dt)
@@ -81,7 +76,7 @@ def estimate(T):
     Q=T1[:,0:(n_imb*n_spread)]
     R1=T1[:,(n_imb*n_spread):]
 
-    K=np.array([-0.01, -0.005, 0.005, 0.01])
+    K=np.array([-1, -0.5, 0.5, 1])
     move_counts=T[(T['dM']!=0)].pivot_table(index=['spread','imb_bucket'], 
                      columns=['next_spread', 'next_imb_bucket'], 
                      values='time',
@@ -106,21 +101,23 @@ def plot_Gstar(ticker,G1,B,T):
     G4=G3+np.dot(np.dot(np.dot(B,B),B),G1)
     G5=G4+np.dot(np.dot(np.dot(np.dot(B,B),B),B),G1)
     G6=G5+np.dot(np.dot(np.dot(np.dot(np.dot(B,B),B),B),B),G1)
-    plt.plot(imb,np.linspace(-0.005,0.005,n_imb)*0,label='Mid adj',marker='o')
-    plt.plot(imb,np.linspace(-0.005,0.005,n_imb),label='Weighted mid adj',marker='o')
+    plt.plot(imb,np.linspace(-1,1,n_imb)*0,label='Mid adj',marker='o')
+    plt.plot(imb,np.linspace(-1,1,n_imb),label='Weighted mid adj',marker='o')
     for i in range(0,n_spread):
         plt.plot(imb,G6[(0+i*n_imb):(n_imb+i*n_imb)],label="spread = "+str(i+1)+" tick adj",marker='o')
-    plt.ylim(-0.005,0.005)
+    plt.ylim(-1,1)
     plt.legend(loc='upper left')
     plt.title(ticker+' adjustments')
     plt.xlabel('Imbalance')
+    print("done")
     return G6
 
-n_imb=10
-n_spread=2
+
+n_imb=5
+n_spread=10
 dt=1
-data=get_df('BAC') 
-ticker='BAC'
+ticker='bananas'
+data=get_df(ticker) 
 pd.set_option('mode.chained_assignment', None)
 import warnings
 warnings.simplefilter(action='ignore', category=UserWarning)
@@ -129,3 +126,4 @@ T,ticksize=prep_data_sym(data,n_imb,dt,n_spread)
 imb=np.linspace(0,1,n_imb)
 G1,B,Q,Q2,R1,R2,K=estimate(T)
 G6=plot_Gstar(ticker,G1,B,T)
+plt.show()
