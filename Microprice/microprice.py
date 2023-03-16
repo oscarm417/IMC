@@ -109,11 +109,10 @@ def plot_Gstar(ticker,G1,B,T):
     plt.legend(loc='upper left')
     plt.title(ticker+' adjustments')
     plt.xlabel('Imbalance')
-    print("done")
     return G6
 
 
-n_imb=10
+n_imb=100
 n_spread=5
 dt=1
 ticker='bananas'
