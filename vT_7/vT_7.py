@@ -39,7 +39,7 @@ class Trader:
         sell_volume_total = 0
         new_orders: list[Order] = []
         for strike in lob_sell_strikes:
-            if strike <= smart_price:       # smart_price?
+            if strike < new_ask:
                 buy_volume = lob_sell_volume_per_strike[lob_sell_strikes.index(strike)]
                 if abs(initial_inventory + buy_volume_total + buy_volume) <= inventory_limit:
                     new_orders.append(Order(product, strike + competitive_addition  , buy_volume))
@@ -53,7 +53,7 @@ class Trader:
                     break
         
         for strike in reversed(lob_buy_strikes):
-            if strike >= smart_price:       #  smart_price?
+            if strike > new_bid:       #  smart_price?
                 sell_volume = lob_buy_volume_per_strike[lob_buy_strikes.index(strike)]
                 if abs(initial_inventory - sell_volume -sell_volume_total) <= inventory_limit:
                     new_orders.append(Order(product, strike - competitive_addition  , -sell_volume))
@@ -257,10 +257,10 @@ class Trader:
             avail_buy_orders = 0
         else:
             avail_buy_orders = min(upper_bound,inventory_limit) - initial_inventory - mod_1_buy_volume
-        if max(lower_bound, -inventory_limit) - initial_inventory - mod_1_sell_volume < 0:
+        if abs(max(lower_bound, -inventory_limit)) + initial_inventory - mod_1_sell_volume < 0:
             avail_sell_orders = 0
         else:
-            avail_sell_orders = max(lower_bound, -inventory_limit) - initial_inventory - mod_1_sell_volume
+            avail_sell_orders = abs(max(lower_bound, -inventory_limit)) + initial_inventory - mod_1_sell_volume
         
         return round(avail_buy_orders), round(avail_sell_orders)
         
