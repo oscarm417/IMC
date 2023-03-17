@@ -141,10 +141,10 @@ class Trader:
                 else:
                     new_bid = m.floor(price) - ((max_spread_width - 2) / 2)
                     new_ask = m.ceil(price) + ((max_spread_width - 2) / 2)
-                    if max_spread_width > 2 and (price - new_bid) / max_spread_width > 0.6:
-                        new_bid = new_bid + 1
-                    elif max_spread_width > 2 and (new_ask - price) / max_spread_width > 0.6:
-                        new_ask = new_ask - 1
+                    #if max_spread_width > 2 and (price - new_bid) / max_spread_width > 0.6:
+                    #    new_bid = new_bid + 1
+                    #elif max_spread_width > 2 and (new_ask - price) / max_spread_width > 0.6:
+                    #    new_ask = new_ask - 1
             elif isinstance(price, int):
                 new_bid = int(price - (max_spread_width/2))
                 new_ask = int(price + (max_spread_width/2))
@@ -158,10 +158,10 @@ class Trader:
                 else:
                     new_bid = m.floor(price) - ((max_spread_width - 1) / 2)
                     new_ask = m.ceil(price) + ((max_spread_width - 1) / 2)
-                    if (price - new_bid) / max_spread_width > 0.6:
-                        new_bid = new_bid + 1
-                    elif (new_ask - price) / max_spread_width > 0.6:
-                        new_ask = new_ask - 1
+                    #if (price - new_bid) / max_spread_width > 0.6:
+                    #    new_bid = new_bid + 1
+                    #elif (new_ask - price) / max_spread_width > 0.6:
+                    #    new_ask = new_ask - 1
             elif isinstance(price, int):
                 new_bid = int(price - ((max_spread_width - 1) / 2))
                 new_ask = int(price + ((max_spread_width - 1) / 2))
