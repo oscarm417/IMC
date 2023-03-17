@@ -8,18 +8,18 @@ class Trader:
 
     def __init__(self):
         self.product_parameters = {'PEARLS':
-                                   {'gamma':0.4,'desired_inventory':0,'spread_size':3,
+                                   {'gamma':0.4,'target_inventory':0,'spread_size':3,
                                     'inventory_limit': 20,'default_vol':7.38812499156771E-05,
                                     'smart_price_history':[],'smart_price_moving_average':[],
                                     'percentage_change_history':[],'perc_stdev_history':[],
-                                    'lower_inventory_limit': 20, 'upper_inventory_limit': 20},
+                                    'lower_inventory_limit': -20, 'upper_inventory_limit': 20},
 
                                   'BANANAS':{
-                                    'gamma':0.34375,'desired_inventory':0,'spread_size':3,
+                                    'gamma':0.34375,'target_inventory':0,'spread_size':3,
                                     'inventory_limit': 20,'default_vol':1.46038979005149E-04,
                                     'smart_price_history':[],'smart_price_moving_average':[],
                                     'percentage_change_history':[],'perc_stdev_history':[],
-                                    'lower_inventory_limit': 20, 'upper_inventory_limit': 20
+                                    'lower_inventory_limit': -20, 'upper_inventory_limit': 20
                                     }
                                 }
         
@@ -225,7 +225,7 @@ class Trader:
                 lob_sell_strikes, lob_buy_volume_per_strike, lob_sell_volume_per_strike, inventory_limit,
                 lob_buy_volume_total, lob_sell_volume_total,best_bid,mid_price,best_ask)
     
-    def calculate_reservation_price(self, product: str, current_inventory: int, desired_inventory: int, smart_price: float, gamma: float) -> float:
+    def calculate_reservation_price(self, product: str, current_inventory: int, target_inventory: int, smart_price: float, gamma: float) -> float:
         """
         Calculates the Reservation price as defined by "High-frequency trading in a limit order book" - Marco Avellaneda & Sasha Stoikov.
         This price will be used to manage the inventory of the strategy. The parameter (T-t) from the formula will not be used as it is assumed that positions will be sold at the end of the time period anyway.
@@ -237,7 +237,7 @@ class Trader:
         perc_volatility =  self.product_parameters[product]['perc_stdev_history'][-1] if len(self.product_parameters[product]['smart_price_history']) >= self.look_back_period else self.product_parameters[product]['default_vol']
         abs_volatility = perc_volatility* smart_price 
         reservation_price = smart_price
-        reservation_price = smart_price - ((current_inventory - desired_inventory) * gamma * (abs_volatility)**2)
+        reservation_price = smart_price - ((current_inventory - target_inventory) * gamma * (abs_volatility)**2)
         
         return reservation_price
     
@@ -249,13 +249,13 @@ class Trader:
             avail_buy_orders = 0
         else:
             avail_buy_orders = min(upper_bound,inventory_limit) - initial_inventory - mod_1_buy_volume
-        if min(lower_bound, inventory_limit) + initial_inventory - mod_1_sell_volume < 0:
+        if abs(max(lower_bound, -inventory_limit)) + initial_inventory - mod_1_sell_volume < 0:
             avail_sell_orders = 0
         else:
-            avail_sell_orders = min(lower_bound,inventory_limit) + initial_inventory - mod_1_sell_volume
+            avail_sell_orders = abs(max(lower_bound, -inventory_limit)) + initial_inventory - mod_1_sell_volume
         
         return round(avail_buy_orders), round(avail_sell_orders)
-        
+    
     def calculate_poisson_distribution(self, available_orders: int, labda: float) -> list:
         """
         Calculates a Poisson distribution with lambda = labda and puts the availabla orders into the different lots according to the distribution.
@@ -275,23 +275,34 @@ class Trader:
                 levels[0] += 1
         return levels
     
-    def update_target_inventory(self, product):
+    def update_current_inventory(self, state, product, position_changes):
+        """
+        Just to clean up the trade_logic and make it more readable.
+        """
         
-        """
-        look_back_period = self.look_back_period
-        moving_average_price = self.product_parameters[product]['smart_price_moving_average']
-        price_history = self.product_parameters[product]['smart_price_history']
-        product_limit = self.product_parameters[product]['inventory_limit']
+        initial_inventory = state.position.get(product,0)  
+        current_inventory = initial_inventory + position_changes
 
-        if len(moving_average_price) >= look_back_period :
-            price_history = price_history[-look_back_period:]
-            moving_average_price  = moving_average_price[-look_back_period:]
-            percent_dec_above = len([1 for ph ,m_a_p in zip(price_history,moving_average_price) if ph > m_a_p])/look_back_period
-            units = percent_dec_above*(2*product_limit)
-            adjusted_desired_inventory = -product_limit + units 
-            print(product,'| adjusted_inventory',adjusted_desired_inventory,"| percent above ma", percent_dec_above,'|')
-            self.product_parameters[product]['desired_inventory'] = adjusted_desired_inventory
+        return current_inventory
+    
+    def update_target_inventory(self, product):
         """
+        Updates the target inventory.
+        """
+        upper_bound = self.product_parameters[product]['upper_inventory_limit']
+        lower_bound = self.product_parameters[product]['lower_inventory_limit']
+        target_inventory = (upper_bound + lower_bound) / 2
+
+        return target_inventory
+    
+    
+    
+    
+    def calculate_spread_size():
+        """
+        Dynamically calculate the spread size. We still need this...
+        """
+        pass
     
     def calc_upper_lower_limit_based_on_trend(self,product):
         """
@@ -316,14 +327,16 @@ class Trader:
         
         """
     
-
+    
+    
+    
     def trade_logic(self, product:str, state: TradingState, market_variables: list):
         #initializing variables 
         gamma = self.product_parameters[product]['gamma']
-        # self.update_target_inventory(product)
-        desired_inventory = self.product_parameters[product]['desired_inventory']
+        target_inventory = self.update_target_inventory(product)
         spread_size = self.product_parameters[product]['spread_size']
-        initial_inventory = state.position.get(product,0)  
+        
+        current_inventory = self.update_current_inventory(state, product, 0)
 
         (lob_average_buy, 
         lob_average_sell, 
@@ -340,20 +353,16 @@ class Trader:
         mid_price,
         best_ask) = market_variables
 
-        avail_buy_orders = inventory_limit - initial_inventory
-        avail_sell_orders = inventory_limit + initial_inventory
-
         if lob_buy_volume_total > 0 and lob_sell_volume_total > 0:
+            
             #CALC SMART PRICE
             smart_price = self.calculate_smart_price(lob_average_buy, 
                                                     lob_average_sell, 
                                                     lob_buy_quantity, 
                                                     lob_sell_quantity)
+            
             #GET PRICE DATA AND CALC VOL
             self.save_price_data_and_vol(product, smart_price)
-            
-            # if product == 'BANANAS':
-            #     print(self.product_parameters[product]['smart_price_moving_average'][-1]) # prints the current exponential moving average
             
             #CALC BID
             smart_price_bid, smart_price_ask = self.calculate_bid_ask(smart_price, spread_size) 
@@ -366,7 +375,7 @@ class Trader:
                                                                                                 lob_sell_strikes, 
                                                                                                 lob_buy_volume_per_strike, 
                                                                                                 lob_sell_volume_per_strike, 
-                                                                                                initial_inventory, 
+                                                                                                current_inventory, 
                                                                                                 inventory_limit, 
                                                                                                 product, 
                                                                                                 smart_price_bid, 
@@ -375,12 +384,13 @@ class Trader:
                                                                                                 )
                         
             #AVAILABLE BUYS AND SELLS
-            avail_buy_orders, avail_sell_orders = self.calculate_available_buy_and_sell(product,inventory_limit, initial_inventory, mod_1_buy_volume, mod_1_sell_volume)
+            avail_buy_orders, avail_sell_orders = self.calculate_available_buy_and_sell(product,inventory_limit, current_inventory, mod_1_buy_volume, mod_1_sell_volume)
             
-            current_inventory = initial_inventory + mod_1_buy_volume - mod_1_sell_volume
+            current_inventory = self.update_current_inventory(state, product, (mod_1_buy_volume + mod_1_sell_volume))
+            
             reservation_price = self.calculate_reservation_price(product,
                                                                 current_inventory,
-                                                                desired_inventory,
+                                                                target_inventory,
                                                                 smart_price,
                                                                 gamma)
             #RESERVATION ADJ. BID, ASK
@@ -418,12 +428,13 @@ class Trader:
         total_transmittable_orders = {}         # Initialize the method output dict as an empty dict
 
         for product in state.order_depths.keys():   # Iterate over all the available products contained in the order depths
+            
             market_variables = self.initialize(state, product)
-            #Reading Inventory
-            initial_inventory = state.position.get(product,0)                
-            #print(initial_inventory)
+            
             mod1,mod2,best_bid,mid_price,best_ask,smart_price_bid,smart_price,smart_price_ask = self.trade_logic(product,state,market_variables)
+            
             total_transmittable_orders[product] = mod1+mod2
+            
             self.output_data(product,state,mod1,mod2,best_bid,mid_price,best_ask,smart_price_bid,smart_price,smart_price_ask) 
             
         return total_transmittable_orders
