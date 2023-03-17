@@ -80,7 +80,7 @@ class Trader:
         buy_order_layout = self.calculate_poisson_distribution(avail_buy_orders, self.labda)
         sell_order_layout = self.calculate_poisson_distribution(avail_sell_orders, self.labda)
         
-        if inventory_adj_bid > smart_price_bid:
+        if inventory_adj_bid > smart_price_bid:                 # using smart_price here instead gives far worse results (~800 seashells less) but it might improve our position management. Copy mod2 from version vT_7 for the way to implement this
             for bid_difference in range(abs(int(inventory_adj_bid) - int(smart_price_bid))):
                 old_value = buy_order_layout.pop(0)
                 if len(buy_order_layout) > 0:
@@ -142,9 +142,9 @@ class Trader:
                     new_bid = m.floor(price) - ((max_spread_width - 2) / 2)
                     new_ask = m.ceil(price) + ((max_spread_width - 2) / 2)
                     #if max_spread_width > 2 and (price - new_bid) / max_spread_width > 0.6:
-                    #    new_bid = new_bid + 1
+                    #    new_bid += 1
                     #elif max_spread_width > 2 and (new_ask - price) / max_spread_width > 0.6:
-                    #    new_ask = new_ask - 1
+                    #    new_ask -= 1
             elif isinstance(price, int):
                 new_bid = int(price - (max_spread_width/2))
                 new_ask = int(price + (max_spread_width/2))
@@ -159,9 +159,9 @@ class Trader:
                     new_bid = m.floor(price) - ((max_spread_width - 1) / 2)
                     new_ask = m.ceil(price) + ((max_spread_width - 1) / 2)
                     #if (price - new_bid) / max_spread_width > 0.6:
-                    #    new_bid = new_bid + 1
+                    #    new_bid += 1
                     #elif (new_ask - price) / max_spread_width > 0.6:
-                    #    new_ask = new_ask - 1
+                    #    new_ask -= 1
             elif isinstance(price, int):
                 new_bid = int(price - ((max_spread_width - 1) / 2))
                 new_ask = int(price + ((max_spread_width - 1) / 2))
