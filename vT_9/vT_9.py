@@ -8,14 +8,14 @@ class Trader:
 
     def __init__(self):
         self.product_parameters = {'PEARLS':
-                                   {'gamma':0.4,'target_inventory':0,'spread_size':3,
+                                   {'gamma':0.4,'spread_size':3,
                                     'inventory_limit': 20,'default_vol':7.38812499156771E-05,
                                     'smart_price_history':[],'smart_price_moving_average':[],
                                     'percentage_change_history':[],'perc_stdev_history':[],
                                     'lower_inventory_limit': -20, 'upper_inventory_limit': 20},
 
                                   'BANANAS':{
-                                    'gamma':0.34375,'target_inventory':0,'spread_size':3,
+                                    'gamma':0.34375,'spread_size':3,
                                     'inventory_limit': 20,'default_vol':1.46038979005149E-04,
                                     'smart_price_history':[],'smart_price_moving_average':[],
                                     'percentage_change_history':[],'perc_stdev_history':[],
@@ -123,7 +123,7 @@ class Trader:
         
         return (new_orders, buy_volume, sell_volume)
 
-    def calculate_bid_ask(self, price: float, max_spread_width: int) -> int:
+    def calculate_bid_ask(self, price: float, max_spread_width: int, product: str, current_inventory: int) -> int:
         """
         Calculates the Bid and Ask price from a given price with the maximum spread witdth.
         A value of max_spread_width = 2 results in spread widths of 2 and 1
@@ -133,6 +133,8 @@ class Trader:
         ...
         Note: max_spread_width has to be an integer to comply with game rules and cant be smaller than 2 -> max_spread_width=2 works but is not very clean because it can cause high imbalances in the proximity of the bids and asks to the smart price
         """
+        target_inventory = self.get_target_inventory(product)
+        
         if max_spread_width % 2 == 0:
             if isinstance(price, float):
                 if price.is_integer():
@@ -141,6 +143,10 @@ class Trader:
                 else:
                     new_bid = m.floor(price) - ((max_spread_width - 2) / 2)
                     new_ask = m.ceil(price) + ((max_spread_width - 2) / 2)
+                    if target_inventory < current_inventory:
+                        new_bid -= 1
+                    elif target_inventory > current_inventory:
+                        new_ask += 1
             elif isinstance(price, int):
                 new_bid = int(price - (max_spread_width/2))
                 new_ask = int(price + (max_spread_width/2))
@@ -151,12 +157,20 @@ class Trader:
                 if price.is_integer():
                     new_bid = int(price - ((max_spread_width - 1) / 2))
                     new_ask = int(price + ((max_spread_width - 1) / 2))
+                    if target_inventory < current_inventory:
+                        new_bid -= 1
+                    elif target_inventory > current_inventory:
+                        new_ask += 1
                 else:
                     new_bid = m.floor(price) - ((max_spread_width - 1) / 2)
                     new_ask = m.ceil(price) + ((max_spread_width - 1) / 2)
             elif isinstance(price, int):
                 new_bid = int(price - ((max_spread_width - 1) / 2))
                 new_ask = int(price + ((max_spread_width - 1) / 2))
+                if target_inventory < current_inventory:
+                    new_bid -= 1
+                elif target_inventory > current_inventory:
+                    new_ask += 1
             else:
                 return
         return new_bid, new_ask 
@@ -275,7 +289,7 @@ class Trader:
                 levels[0] += 1
         return levels
     
-    def update_current_inventory(self, state, product, position_changes):
+    def get_current_inventory(self, state, product, position_changes):
         """
         Just to clean up the trade_logic and make it more readable.
         """
@@ -285,7 +299,7 @@ class Trader:
 
         return current_inventory
     
-    def update_target_inventory(self, product):
+    def get_target_inventory(self, product):
         """
         Updates the target inventory.
         """
@@ -295,9 +309,24 @@ class Trader:
 
         return target_inventory
     
+    def output_data(self,product, state,mod1,mod2,best_bid,mid_price,best_ask,smart_price_bid,smart_price,smart_price_ask):
+        """
+        Print data that is needed for the visualization tool. 
+        """
+        #print('\n')
+        time_stamp = state.timestamp
+        order_depth = state.order_depths[product]
+        buy_orders = order_depth.buy_orders
+        sell_orders = order_depth.sell_orders
+        our_previous_filled = state.own_trades.get(product,0)
+        market_previous_filled = state.market_trades.get(product,0)
+        our_position = state.position.get(product,0)
+        #best_bid ;{best_bid}|mid_price;{mid_price}|best_ask;{best_ask}|
+        #print(f"time;{time_stamp}|product;{product}|smart_price_bid;{smart_price_bid}|smart_price;{smart_price}|smart_price_ask;{smart_price_ask}|our_postion;{our_position}| buy_orders;{buy_orders}| sell_orders;{sell_orders}| our_previous_filled;{our_previous_filled}| market_previous_filled;{market_previous_filled}")
     
     
     
+    #TO DO:
     def calculate_spread_size():
         """
         Dynamically calculate the spread size. We still need this...
@@ -331,13 +360,20 @@ class Trader:
     
     
     def trade_logic(self, product:str, state: TradingState, market_variables: list):
+        
         #initializing variables 
         gamma = self.product_parameters[product]['gamma']
-        target_inventory = self.update_target_inventory(product)
+        
+        #UPDATES THE TARGET INVENTORY
+        target_inventory = self.get_target_inventory(product)
+        
+        #CALCULATE THE SPREAD FOR THE CURRENT ITERATION
         spread_size = self.product_parameters[product]['spread_size']
         
-        current_inventory = self.update_current_inventory(state, product, 0)
+        #UPDATE THE CURRENT INVENTORY
+        current_inventory = self.get_current_inventory(state, product, 0)
 
+        #DEFINE AND GET ALL NEEDED ORDERBOOK DATA
         (lob_average_buy, 
         lob_average_sell, 
         lob_buy_quantity, 
@@ -353,6 +389,7 @@ class Trader:
         mid_price,
         best_ask) = market_variables
 
+        #CHECKS IF THERE ARE ORDERS ON BOTH SIDES OF THE ORDERBOOK
         if lob_buy_volume_total > 0 and lob_sell_volume_total > 0:
             
             #CALC SMART PRICE
@@ -365,7 +402,7 @@ class Trader:
             self.save_price_data_and_vol(product, smart_price)
             
             #CALC BID
-            smart_price_bid, smart_price_ask = self.calculate_bid_ask(smart_price, spread_size) 
+            smart_price_bid, smart_price_ask = self.calculate_bid_ask(smart_price, spread_size, product, current_inventory) 
 
             # UPDATING INVENTORY BOUNDS BASED ON TRENDS
             # self.calc_upper_lower_limit_based_on_trend(product)
@@ -382,19 +419,24 @@ class Trader:
                                                                                                 smart_price_ask,
                                                                                                 smart_price
                                                                                                 )
-                        
-            #AVAILABLE BUYS AND SELLS
+            
+            #AVAILABLE BUYS AND SELLS AFTER MOD 1 ORDERS ARE EXECUTED
             avail_buy_orders, avail_sell_orders = self.calculate_available_buy_and_sell(product,inventory_limit, current_inventory, mod_1_buy_volume, mod_1_sell_volume)
             
-            current_inventory = self.update_current_inventory(state, product, (mod_1_buy_volume + mod_1_sell_volume))
+            #CALCULATE CURRENT INVENTORY WITH MOD 1 ORDERS ALREADY INCLUDED
+            current_inventory = self.get_current_inventory(state, product, (mod_1_buy_volume + mod_1_sell_volume))
             
+            #CALCULATE RESERVATION PRICE
             reservation_price = self.calculate_reservation_price(product,
                                                                 current_inventory,
                                                                 target_inventory,
                                                                 smart_price,
                                                                 gamma)
+            
             #RESERVATION ADJ. BID, ASK
-            inventory_adj_bid, inventory_adj_ask = self.calculate_bid_ask(reservation_price, spread_size)
+            inventory_adj_bid, inventory_adj_ask = self.calculate_bid_ask(reservation_price, spread_size, product, current_inventory)
+            
+            #MOD2 BUY AND SELL ORDERS
             mod_2_new_orders, mod_2_buy_volume, mod_2_sell_volume = self.module_2_market_maker(product, 
                                                                                                 inventory_adj_bid, 
                                                                                                 inventory_adj_ask, 
@@ -403,38 +445,36 @@ class Trader:
                                                                                                 avail_buy_orders, 
                                                                                                 avail_sell_orders
                                                                                                 )
+            
+            #RETURN ALL ORDER DATA AND THE DATA NEEDED FOR VISUALIZATION
             return mod_1_new_orders,mod_2_new_orders,best_bid,mid_price,best_ask,smart_price_bid,smart_price,smart_price_ask
-        else: 
+        
+        else:
+            # THIS IS WHAT HAPPENS WHEN ONE SIDE OF THE ORDERBOOK IS EMPTY (NO BIDS OR NO BUYS) -> WE WILL STILL NEED SOMETHING IN THAT CASE -> MAYBE ASK FOR RIDICULOUS PRICES? 
             return []
-        
-    def output_data(self,product, state,mod1,mod2,best_bid,mid_price,best_ask,smart_price_bid,smart_price,smart_price_ask):
-        print('\n')
-        time_stamp = state.timestamp
-        order_depth = state.order_depths[product]
-        buy_orders = order_depth.buy_orders
-        sell_orders = order_depth.sell_orders
-        our_previous_filled = state.own_trades.get(product,0)
-        market_previous_filled = state.market_trades.get(product,0)
-        our_position = state.position.get(product,0)
-        #best_bid ;{best_bid}|mid_price;{mid_price}|best_ask;{best_ask}|
-        print(f"time;{time_stamp}|product;{product}|smart_price_bid;{smart_price_bid}|smart_price;{smart_price}|smart_price_ask;{smart_price_ask}|our_postion;{our_position}| buy_orders;{buy_orders}| sell_orders;{sell_orders}| our_previous_filled;{our_previous_filled}| market_previous_filled;{market_previous_filled}")
-        
         
     def run(self, state: TradingState) -> Dict[str, List[Order]]:
         """
         Takes all buy and sell orders for all symbols as an input,
         and outputs a list of orders to be sent
         """
-        total_transmittable_orders = {}         # Initialize the method output dict as an empty dict
+        #INITIALIZE THE OUTPUT DICT AS AN EMPTY DICT
+        total_transmittable_orders = {}
 
-        for product in state.order_depths.keys():   # Iterate over all the available products contained in the order depths
+        #ITERATE OVER ALL AVAILABLE PRODUCTS IN THE ORDER DEPTHS
+        for product in state.order_depths.keys():
             
+            #DEFINE AND GET ALL ORDER BOOK DATA
             market_variables = self.initialize(state, product)
             
+            #EXECUTE THE TRADE LOGIC AND OUTPUTS ALL ORDERS + DATA NEEDED FOR VISUALIZATION
             mod1,mod2,best_bid,mid_price,best_ask,smart_price_bid,smart_price,smart_price_ask = self.trade_logic(product,state,market_variables)
             
-            total_transmittable_orders[product] = mod1+mod2
+            #ADDS ALL ORDERS TO BE TRANSMITTED TO THE EMPTY DICT
+            total_transmittable_orders[product] = mod1 + mod2
             
+            #PRINTS THE OUTPUT DATA NEEDED FOR VISUALIZATION
             self.output_data(product,state,mod1,mod2,best_bid,mid_price,best_ask,smart_price_bid,smart_price,smart_price_ask) 
-            
+        
+        #RETURNS ALL ORDER DATA TO THE ENGINE
         return total_transmittable_orders
