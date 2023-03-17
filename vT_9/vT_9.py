@@ -23,7 +23,7 @@ class Trader:
                                     }
                                 }
         
-        self.look_back_period = float('inf') #use float('inf') if you dont want this used
+        self.look_back_period = float('inf') # float('inf') #use float('inf') if you dont want this used
         self.labda  = 0.8
     
     def module_1_order_tapper(self, lob_buy_strikes, lob_sell_strikes, lob_buy_volume_per_strike, lob_sell_volume_per_strike, initial_inventory, inventory_limit, product, new_bid, new_ask, smart_price):
@@ -68,7 +68,7 @@ class Trader:
 
         return (new_orders, buy_volume_total, sell_volume_total)
 
-    def module_2_market_maker(self, product, inventory_adj_bid: int, inventory_adj_ask: int, smart_price_bid: int, smart_price_ask: int, avail_buy_orders: int, avail_sell_orders: int, smart_price):
+    def module_2_market_maker(self, product, inventory_adj_bid: int, inventory_adj_ask: int, smart_price_bid: int, smart_price_ask: int, avail_buy_orders: int, avail_sell_orders: int, smart_price: float):
         """
         Module for Market Making. This takes the bid/ask of the smart price and the bid and ask of the inventory adjusted bid/ask and places orders at them.
         The layout for both bid/ask is given by poisson distribution with a lamda given to the function.
@@ -80,8 +80,8 @@ class Trader:
         buy_order_layout = self.calculate_poisson_distribution(avail_buy_orders, self.labda)
         sell_order_layout = self.calculate_poisson_distribution(avail_sell_orders, self.labda)
         
-        if inventory_adj_bid >= smart_price:
-            for bid_difference in range(abs(int(inventory_adj_bid) - m.floor(smart_price))):
+        if inventory_adj_bid > smart_price_bid:
+            for bid_difference in range(abs(int(inventory_adj_bid) - int(smart_price_bid))):
                 old_value = buy_order_layout.pop(0)
                 if len(buy_order_layout) > 0:
                     buy_order_layout[0] +=  old_value
@@ -91,18 +91,18 @@ class Trader:
             for idx, bid_quantity in enumerate(buy_order_layout):
                 if bid_quantity == 0: 
                     break
-                new_orders.append(Order(product, (m.floor(smart_price) - idx), bid_quantity))
+                new_orders.append(Order(product, (smart_price_bid - idx), bid_quantity))
                 buy_volume += bid_quantity
                 
-        elif inventory_adj_bid < smart_price:
+        elif inventory_adj_bid <= smart_price_bid:
             for idx, bid_quantity in enumerate(buy_order_layout):
                 if bid_quantity == 0: 
                     break
                 new_orders.append(Order(product, (inventory_adj_bid - idx), bid_quantity))
                 buy_volume += bid_quantity
         
-        if inventory_adj_ask <= smart_price:
-            for ask_difference in range(abs(m.ceil(smart_price) - int(inventory_adj_ask))):
+        if inventory_adj_ask < smart_price_ask:
+            for ask_difference in range(abs(int(smart_price_ask) - int(inventory_adj_ask))):
                 old_value = sell_order_layout.pop(0)
                 if len(sell_order_layout) > 0:
                     sell_order_layout[0] +=  old_value
@@ -111,10 +111,10 @@ class Trader:
             for idx, ask_quantity in enumerate(sell_order_layout):
                 if ask_quantity == 0: 
                     break
-                new_orders.append(Order(product, (m.ceil(smart_price) + idx), -ask_quantity))
+                new_orders.append(Order(product, (smart_price_ask + idx), -ask_quantity))
                 sell_volume += ask_quantity
                 
-        elif inventory_adj_ask > smart_price:
+        elif inventory_adj_ask >= smart_price_ask:
             for idx, ask_quantity in enumerate(sell_order_layout):
                 if ask_quantity == 0: 
                     break
@@ -143,7 +143,7 @@ class Trader:
                     new_ask = m.ceil(price) + ((max_spread_width - 2) / 2)
                     if max_spread_width > 2 and (price - new_bid) / max_spread_width > 0.6:
                         new_bid = new_bid + 1
-                    if max_spread_width > 2 and (new_ask - price) / max_spread_width > 0.6:
+                    elif max_spread_width > 2 and (new_ask - price) / max_spread_width > 0.6:
                         new_ask = new_ask - 1
             elif isinstance(price, int):
                 new_bid = int(price - (max_spread_width/2))
@@ -173,8 +173,7 @@ class Trader:
         """
         Calculates the "Smart Price" described in "Machine Learning for Market Microstructure and High Frequency Trading" - Michael Kearns
         """
-        #smart_price = ((lob_average_buy *  lob_sell_quantity) + (lob_average_sell * lob_buy_quantity) ) / (lob_buy_quantity + lob_sell_quantity)
-        smart_price = (lob_average_buy + lob_average_sell) / 2
+        smart_price = ((lob_average_buy *  lob_sell_quantity) + (lob_average_sell * lob_buy_quantity) ) / (lob_buy_quantity + lob_sell_quantity)
         
         return smart_price
     
@@ -232,7 +231,7 @@ class Trader:
 
         return (lob_average_buy, lob_average_sell, lob_buy_quantity, lob_sell_quantity, lob_buy_strikes, 
                 lob_sell_strikes, lob_buy_volume_per_strike, lob_sell_volume_per_strike, inventory_limit,
-                lob_buy_volume_total, lob_sell_volume_total)
+                lob_buy_volume_total, lob_sell_volume_total,best_bid,mid_price,best_ask)
     
     def calculate_reservation_price(self, product: str, current_inventory: int, desired_inventory: int, smart_price: float, gamma: float) -> float:
         """
@@ -249,7 +248,7 @@ class Trader:
         reservation_price = smart_price - ((current_inventory - desired_inventory) * gamma * (abs_volatility)**2)
         
         return reservation_price
-        
+    
     def calculate_available_buy_and_sell(self,product, inventory_limit,initial_inventory,mod_1_buy_volume,mod_1_sell_volume):
         upper_bound = self.product_parameters[product]['upper_inventory_limit']
         lower_bound = self.product_parameters[product]['lower_inventory_limit']
@@ -264,7 +263,7 @@ class Trader:
             avail_sell_orders = abs(max(lower_bound, -inventory_limit)) + initial_inventory - mod_1_sell_volume
         
         return round(avail_buy_orders), round(avail_sell_orders)
-        
+    
     def calculate_poisson_distribution(self, available_orders: int, labda: float) -> list:
         """
         Calculates a Poisson distribution with lambda = labda and puts the availabla orders into the different lots according to the distribution.
@@ -322,8 +321,9 @@ class Trader:
             else: #update upper bound
                 self.product_parameters[product]['upper_inventory_limit'] = inventory_bound
                 self.product_parameters[product]['lower_inventory_limit'] = product_limit
+        
         """
-
+    
     def trade_logic(self, product:str, state: TradingState, market_variables: list):
         #initializing variables 
         gamma = self.product_parameters[product]['gamma']
@@ -342,7 +342,10 @@ class Trader:
         lob_sell_volume_per_strike, 
         inventory_limit,
         lob_buy_volume_total,
-        lob_sell_volume_total) = market_variables
+        lob_sell_volume_total,
+        best_bid,
+        mid_price,
+        best_ask) = market_variables
 
         avail_buy_orders = inventory_limit - initial_inventory
         avail_sell_orders = inventory_limit + initial_inventory
@@ -354,15 +357,10 @@ class Trader:
                                                     lob_buy_quantity, 
                                                     lob_sell_quantity)
             #GET PRICE DATA AND CALC VOL
-            
             self.save_price_data_and_vol(product, smart_price)
             
-            
-            if len(self.product_parameters[product]['smart_price_history']) > 0:
-                smart_price = stat.fmean(self.product_parameters[product]['smart_price_history'])
-            
-            #if product == 'BANANAS':
-            #    print(self.product_parameters[product]['smart_price_moving_average'][-1]) # prints the current exponential moving average
+            # if product == 'BANANAS':
+            #     print(self.product_parameters[product]['smart_price_moving_average'][-1]) # prints the current exponential moving average
                 
             #CALC BID
             smart_price_bid, smart_price_ask = self.calculate_bid_ask(smart_price, spread_size) 
@@ -403,18 +401,22 @@ class Trader:
                                                                                                 avail_sell_orders,
                                                                                                 smart_price
                                                                                                 )
-            
-            if product == "BANANAS":
-                print(smart_price, current_inventory)
-                print(mod_1_new_orders + mod_2_new_orders)
-                
-            
-            return mod_1_new_orders + mod_2_new_orders
+            return mod_1_new_orders,mod_2_new_orders,best_bid,mid_price,best_ask,smart_price_bid,smart_price,smart_price_ask
         else: 
             return []
-        
-        
-        
+    
+    def output_data(self,product, state,mod1,mod2,best_bid,mid_price,best_ask,smart_price_bid,smart_price,smart_price_ask):
+        print('\n')
+        time_stamp = state.timestamp
+        order_depth = state.order_depths[product]
+        buy_orders = order_depth.buy_orders
+        sell_orders = order_depth.sell_orders
+        our_previous_filled = state.own_trades.get(product,0)
+        market_previous_filled = state.market_trades.get(product,0)
+        our_position = state.position.get(product,0)
+        #best_bid ;{best_bid}|mid_price;{mid_price}|best_ask;{best_ask}|
+        print(f"time;{time_stamp}|product;{product}|smart_price_bid;{smart_price_bid}|smart_price;{smart_price}|smart_price_ask;{smart_price_ask}|our_postion;{our_position}| buy_orders;{buy_orders}| sell_orders;{sell_orders}| our_previous_filled;{our_previous_filled}| market_previous_filled;{market_previous_filled}")
+    
     def run(self, state: TradingState) -> Dict[str, List[Order]]:
         """
         Takes all buy and sell orders for all symbols as an input,
@@ -427,6 +429,8 @@ class Trader:
             #Reading Inventory
             initial_inventory = state.position.get(product,0)                
             #print(initial_inventory)
-            total_transmittable_orders[product] = self.trade_logic(product,state,market_variables)
-
+            mod1,mod2,best_bid,mid_price,best_ask,smart_price_bid,smart_price,smart_price_ask = self.trade_logic(product,state,market_variables)
+            total_transmittable_orders[product] = mod1+mod2
+            self.output_data(product,state,mod1,mod2,best_bid,mid_price,best_ask,smart_price_bid,smart_price,smart_price_ask) 
+            
         return total_transmittable_orders
