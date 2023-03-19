@@ -21,7 +21,6 @@ class Trader:
                                     }
                                 }
         self.look_back_period = float('inf') # float('inf') #use float('inf') if you dont want this used
-        self.vol_look_back_period = 10
     
     def module_1_order_tapper(self, lob_buy_strikes, lob_sell_strikes, lob_buy_volume_per_strike, lob_sell_volume_per_strike, initial_inventory, inventory_limit, product, new_bid, new_ask, smart_price):
         """
@@ -89,18 +88,18 @@ class Trader:
     
     def calculate_bid_ask_dynamic(self, smart_price, bid_price_1, ask_price_1, lob_buy_strikes, lob_sell_strikes):
         """
-        
+        Calculates the the best possible Bid/Ask price to maximize profit.
         """
+        
         for bid_strike in list(reversed(lob_buy_strikes)):
             if smart_price > bid_strike and abs(smart_price - bid_strike) > 1.5:
                 smart_bid = bid_strike + 1
                 break
         
         for ask_strike in lob_sell_strikes:
-            if smart_price < ask_strike:
+            if smart_price < ask_strike and abs(smart_price - ask_strike) > 1.5:
                 smart_ask = ask_strike - 1
                 break
-        
         
         while smart_bid > smart_price:
             smart_bid -= 1
