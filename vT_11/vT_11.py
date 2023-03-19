@@ -62,9 +62,7 @@ class Trader:
 
     def module_2_market_maker(self, product, smart_price_bid: int, smart_price_ask: int, avail_buy_orders: int, avail_sell_orders: int):
         """
-        Module for Market Making. This takes the bid/ask of the smart price and the bid and ask of the inventory adjusted bid/ask and places orders at them.
-        The layout for both bid/ask is given by poisson distribution with a lamda given to the function.
-        The inventory adjusted bid/ask cant get below/above the bids/asks defined by the smart price, this would result in unfavorable exectuion prices. Instead, it "pushes" all orders breaking that rule to the smart price bid/ask and adds them up.
+        Module for Market Making. This takes the bid/ask of the smart price and places orders at them.
         """
         buy_volume = 0
         sell_volume = 0
