@@ -88,16 +88,16 @@ class Trader:
     
     def calculate_bid_ask_dynamic(self, smart_price, bid_price_1, ask_price_1, lob_buy_strikes, lob_sell_strikes):
         """
-        Calculates the the best possible Bid/Ask price to maximize profit.
+        Calculates the the best available Bid/Ask price to maximize profit.
         """
         
         for bid_strike in list(reversed(lob_buy_strikes)):
-            if smart_price > bid_strike and abs(smart_price - bid_strike) > 1.5:
+            if smart_price > bid_strike and abs(smart_price - bid_strike) > 1:
                 smart_bid = bid_strike + 1
                 break
         
         for ask_strike in lob_sell_strikes:
-            if smart_price < ask_strike and abs(smart_price - ask_strike) > 1.5:
+            if smart_price < ask_strike and abs(smart_price - ask_strike) > 1:
                 smart_ask = ask_strike - 1
                 break
         
