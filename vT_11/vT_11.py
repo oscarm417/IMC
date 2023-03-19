@@ -40,12 +40,10 @@ class Trader:
                 buy_volume = lob_sell_volume_per_strike[lob_sell_strikes.index(strike)]
                 if abs(initial_inventory + buy_volume_total + buy_volume) <= inventory_limit:
                     new_orders.append(Order(product, strike + competitive_addition  , buy_volume))
-                    #print("BUY ", buy_volume, "x ", product, " @ ", strike)
                     buy_volume_total += buy_volume
                 else:
                     buy_volume = abs(inventory_limit - initial_inventory - buy_volume_total)
                     new_orders.append(Order(product, strike + competitive_addition  , buy_volume))
-                    #print("BUY ", buy_volume, "x ", product, " @ ", strike)
                     buy_volume_total += buy_volume
                     break
         
@@ -54,12 +52,10 @@ class Trader:
                 sell_volume = lob_buy_volume_per_strike[lob_buy_strikes.index(strike)]
                 if abs(initial_inventory - sell_volume -sell_volume_total) <= inventory_limit:
                     new_orders.append(Order(product, strike - competitive_addition  , -sell_volume))
-                    #print("SELL ", -sell_volume, "x ", product, " @ ", strike)
                     sell_volume_total += sell_volume
                 else:
                     sell_volume = abs(initial_inventory + inventory_limit - sell_volume_total)
                     new_orders.append(Order(product, strike - competitive_addition  , -sell_volume))
-                    #print("SELL ", -sell_volume, "x ", product, " @ ", strike)
                     sell_volume_total += sell_volume
                     break
 
@@ -90,66 +86,21 @@ class Trader:
             buy_volume += ask_quantity
         
         return (new_orders, buy_volume, sell_volume)
-
-    def calculate_bid_ask(self, price: float, max_spread_width: int, product: str, current_inventory: int) -> int:
-        """
-        Calculates the Bid and Ask price from a given price with the maximum spread witdth.
-        A value of max_spread_width = 2 results in spread widths of 2 and 1
-        A value of max_spread_width = 3 results in spread widths of 2 and 3, while checking that the distance from either bid/ask to the smart price doesnt make up for more than 60% of the spread
-        A value of max_spread_width = 4 results in spread widths of 4 and 3, while checking that the distance from either bid/ask to the smart price doesnt make up for more than 60% of the spread
-        A value of max_spread_width = 5 results in spread widths of 4 and 5
-        ...
-        Note: max_spread_width has to be an integer to comply with game rules and cant be smaller than 2 -> max_spread_width=2 works but is not very clean because it can cause high imbalances in the proximity of the bids and asks to the smart price
-        """
-        target_inventory = self.get_target_inventory(product)
-        
-        if max_spread_width % 2 == 0:
-            if isinstance(price, float):
-                if price.is_integer():
-                    new_bid = int(price - (max_spread_width/2))
-                    new_ask = int(price + (max_spread_width/2))
-                else:
-                    new_bid = m.floor(price) - ((max_spread_width - 2) / 2)
-                    new_ask = m.ceil(price) + ((max_spread_width - 2) / 2)
-                    if target_inventory < current_inventory:
-                        new_bid -= 1
-                    elif target_inventory > current_inventory:
-                        new_ask += 1
-            elif isinstance(price, int):
-                new_bid = int(price - (max_spread_width/2))
-                new_ask = int(price + (max_spread_width/2))
-            else:
-                return
-        else:
-            if isinstance(price, float):
-                if price.is_integer():
-                    new_bid = int(price - ((max_spread_width - 1) / 2))
-                    new_ask = int(price + ((max_spread_width - 1) / 2))
-                    if target_inventory < current_inventory:
-                        new_bid -= 1
-                    elif target_inventory > current_inventory:
-                        new_ask += 1
-                else:
-                    new_bid = m.floor(price) - ((max_spread_width - 1) / 2)
-                    new_ask = m.ceil(price) + ((max_spread_width - 1) / 2)
-            elif isinstance(price, int):
-                new_bid = int(price - ((max_spread_width - 1) / 2))
-                new_ask = int(price + ((max_spread_width - 1) / 2))
-                if target_inventory < current_inventory:
-                    new_bid -= 1
-                elif target_inventory > current_inventory:
-                    new_ask += 1
-            else:
-                return
-        return new_bid, new_ask 
     
-    def calculate_bid_ask_dynamic(self,smart_price,bid_price_1,ask_price_1,percent_of_max_bid = .75):
-        bid_diff = abs(smart_price - bid_price_1 )
-        ask_diff = abs(smart_price - ask_price_1 )
-        max_spread_size = max(bid_diff, ask_diff)
-        spread = max_spread_size * percent_of_max_bid 
-        smart_bid = m.ceil(smart_price - spread) 
-        smart_ask = m.floor(smart_price + spread) 
+    def calculate_bid_ask_dynamic(self, smart_price, bid_price_1, ask_price_1, lob_buy_strikes, lob_sell_strikes):
+        """
+        
+        """
+        for bid_strike in list(reversed(lob_buy_strikes)):
+            if smart_price > bid_strike and abs(smart_price - bid_strike) > 1.5:
+                smart_bid = bid_strike + 1
+                break
+        
+        for ask_strike in lob_sell_strikes:
+            if smart_price < ask_strike:
+                smart_ask = ask_strike - 1
+                break
+        
         
         while smart_bid > smart_price:
             smart_bid -= 1
@@ -269,7 +220,7 @@ class Trader:
         """
         Print data that is needed for the visualization tool. 
         """
-        #print('\n')
+        print('\n')
         time_stamp = state.timestamp
         order_depth = state.order_depths[product]
         buy_orders = order_depth.buy_orders
@@ -278,7 +229,7 @@ class Trader:
         market_previous_filled = state.market_trades.get(product,0)
         our_position = state.position.get(product,0)
         #best_bid ;{best_bid}|mid_price;{mid_price}|best_ask;{best_ask}|
-        #print(f"time;{time_stamp}|product;{product}|smart_price_bid;{smart_price_bid}|smart_price;{smart_price}|smart_price_ask;{smart_price_ask}|our_postion;{our_position}| buy_orders;{buy_orders}| sell_orders;{sell_orders}| our_previous_filled;{our_previous_filled}| market_previous_filled;{market_previous_filled}")
+        print(f"time;{time_stamp}|product;{product}|smart_price_bid;{smart_price_bid}|smart_price;{smart_price}|smart_price_ask;{smart_price_ask}|our_postion;{our_position}| buy_orders;{buy_orders}| sell_orders;{sell_orders}| our_previous_filled;{our_previous_filled}| market_previous_filled;{market_previous_filled}")
     
     def calc_upper_lower_limit_based_on_trend(self,product):
         """
@@ -313,9 +264,6 @@ class Trader:
         
         #UPDATE THE CURRENT INVENTORY
         current_inventory = self.get_current_inventory(state, product, 0)
-        
-        if product =='BANANAS':
-            print(current_inventory)
 
         #DEFINE AND GET ALL NEEDED ORDERBOOK DATA
         (lob_average_buy, 
@@ -347,7 +295,7 @@ class Trader:
             
             #CALC BID/ASK
             # smart_price_bid, smart_price_ask = self.calculate_bid_ask(smart_price, spread_size, product, current_inventory) 
-            smart_price_bid, smart_price_ask = self.calculate_bid_ask_dynamic(smart_price,best_bid,best_ask)
+            smart_price_bid, smart_price_ask = self.calculate_bid_ask_dynamic(smart_price,best_bid,best_ask, lob_buy_strikes, lob_sell_strikes)
             
             #MOD1 BUY AND SELL ORDERS 
             mod_1_new_orders, mod_1_buy_volume, mod_1_sell_volume = self.module_1_order_tapper(lob_buy_strikes, 
