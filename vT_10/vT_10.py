@@ -22,7 +22,7 @@ class Trader:
                                     'lower_inventory_limit': -20, 'upper_inventory_limit': 20
                                     }
                                 }
-        self.percent_of_max_bid = .9
+        self.percent_of_max_bid = .75
         self.look_back_period = float('inf') # float('inf') #use float('inf') if you dont want this used
         self.labda  = 0.8
     
@@ -176,7 +176,7 @@ class Trader:
         return new_bid, new_ask 
     
 
-    def calculate_bid_ask_dynamic(self,smart_price,bid_price_1,ask_price_1,percent_of_max_bid = .5):
+    def calculate_bid_ask_dynamic(self,smart_price,bid_price_1,ask_price_1,percent_of_max_bid = .8):
         bid_diff = abs(smart_price - bid_price_1 )
         ask_diff = abs(smart_price - ask_price_1 )
         max_spread_size = max(bid_diff,ask_diff)
@@ -333,7 +333,7 @@ class Trader:
         market_previous_filled = state.market_trades.get(product,0)
         our_position = state.position.get(product,0)
         #best_bid ;{best_bid}|mid_price;{mid_price}|best_ask;{best_ask}|
-        #print(f"time;{time_stamp}|product;{product}|smart_price_bid;{smart_price_bid}|smart_price;{smart_price}|smart_price_ask;{smart_price_ask}|our_postion;{our_position}| buy_orders;{buy_orders}| sell_orders;{sell_orders}| our_previous_filled;{our_previous_filled}| market_previous_filled;{market_previous_filled}")
+        print(f"time;{time_stamp}|product;{product}|smart_price_bid;{smart_price_bid}|smart_price;{smart_price}|smart_price_ask;{smart_price_ask}|our_postion;{our_position}| buy_orders;{buy_orders}| sell_orders;{sell_orders}| our_previous_filled;{our_previous_filled}| market_previous_filled;{market_previous_filled}")
     
     
     
