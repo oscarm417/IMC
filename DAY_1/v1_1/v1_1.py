@@ -8,21 +8,19 @@ class Trader:
 
     def __init__(self):
         self.product_parameters = {'PEARLS':
-                                   {'inventory_limit': 20, 'fair_price' : 10000, 'PnL': 0,
+                                   {'inventory_limit': 20, 'fair_price' : 10000,
                                     'smart_price_history':[],'smart_price_moving_average':[],
                                     'percentage_change_history':[],'perc_stdev_history':[],
                                     'lower_inventory_limit': -20, 'upper_inventory_limit': 20},
 
                                   'BANANAS':{
-                                    'inventory_limit': 20, 'fair_price' : 5000, 'PnL': 0,
+                                    'inventory_limit': 20, 'fair_price' : 5000,
                                     'smart_price_history':[],'smart_price_moving_average':[],
                                     'percentage_change_history':[],'perc_stdev_history':[],
                                     'lower_inventory_limit': -20, 'upper_inventory_limit': 20
                                     }
                                 }
         self.look_back_period = float('inf') # float('inf') #use float('inf') if you dont want this used
-        self.holdings = 0
-        self.last_trade = 0
     
     def module_1_order_tapper(self, lob_buy_strikes, lob_sell_strikes, lob_buy_volume_per_strike, lob_sell_volume_per_strike, initial_inventory, inventory_limit, product, new_bid, new_ask, smart_price):
         """
@@ -90,20 +88,21 @@ class Trader:
         Calculates the the best available Bid/Ask price to maximize profit.
         """
         
-        for bid_strike in list(reversed(lob_buy_strikes)):
+        for idx, bid_strike in enumerate(list(reversed(lob_buy_strikes))):
             if smart_price > bid_strike and abs(smart_price - bid_strike) > 1:
                 smart_bid = bid_strike + 1
                 break
+            elif idx+1 == len(lob_buy_strikes):
+                smart_bid = m.floor(smart_price) - 1
+                break
         
-        for ask_strike in lob_sell_strikes:
+        for idx, ask_strike in enumerate(lob_sell_strikes):
             if smart_price < ask_strike and abs(smart_price - ask_strike) > 1:
                 smart_ask = ask_strike - 1
                 break
-        
-        while smart_bid > smart_price:
-            smart_bid -= 1
-        while smart_ask < smart_price:
-            smart_ask += 1
+            elif idx+1 == len(lob_sell_strikes):
+                smart_ask = m.ceil(smart_price) + 1
+                break
         
         if smart_ask == ask_price_1 and smart_ask - 1 >= smart_price:
             smart_ask -= 1
