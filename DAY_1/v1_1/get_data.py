@@ -17,7 +17,16 @@ class Trader:
             if product == 'BANANAS':
                 
                 order_depth: OrderDepth = state.order_depths[product]
+                buy_orders = order_depth.buy_orders
+                sell_orders = order_depth.sell_orders
                 
-                print(order_depth.buy_orders, order_depth.sell_orders)
+                if product in state.observations:
+                    observations = state.observations[product]
+                
+                if product in state.position:
+                    position = state.position[product]
+                
+                if "PEARLS" in state.market_trades or "BANANAS" in state.market_trades:
+                    market_trades = state.market_trades
 
         return result

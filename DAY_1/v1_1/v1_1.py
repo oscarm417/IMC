@@ -8,19 +8,21 @@ class Trader:
 
     def __init__(self):
         self.product_parameters = {'PEARLS':
-                                   {'inventory_limit': 20,'default_vol':7.38812499156771E-05,
+                                   {'inventory_limit': 20, 'fair_price' : 10000, 'PnL': 0,
                                     'smart_price_history':[],'smart_price_moving_average':[],
                                     'percentage_change_history':[],'perc_stdev_history':[],
                                     'lower_inventory_limit': -20, 'upper_inventory_limit': 20},
 
                                   'BANANAS':{
-                                    'inventory_limit': 20,'default_vol':1.46038979005149E-04,
+                                    'inventory_limit': 20, 'fair_price' : 5000, 'PnL': 0,
                                     'smart_price_history':[],'smart_price_moving_average':[],
                                     'percentage_change_history':[],'perc_stdev_history':[],
                                     'lower_inventory_limit': -20, 'upper_inventory_limit': 20
                                     }
                                 }
         self.look_back_period = float('inf') # float('inf') #use float('inf') if you dont want this used
+        self.holdings = 0
+        self.last_trade = 0
     
     def module_1_order_tapper(self, lob_buy_strikes, lob_sell_strikes, lob_buy_volume_per_strike, lob_sell_volume_per_strike, initial_inventory, inventory_limit, product, new_bid, new_ask, smart_price):
         """
@@ -28,7 +30,6 @@ class Trader:
         This could also be done for the Smart Price and not for the bids and asks but this could result in resulting offers in between the bid and ask which takes away volume from the market making algo.
         Will need to backtest if either this method or using the Smart Price instead gives better results.
         """
-        competitive_addition = 0
         buy_volume = 0 
         sell_volume = 0
         buy_volume_total = 0
@@ -38,11 +39,11 @@ class Trader:
             if strike < new_ask:
                 buy_volume = lob_sell_volume_per_strike[lob_sell_strikes.index(strike)]
                 if abs(initial_inventory + buy_volume_total + buy_volume) <= inventory_limit:
-                    new_orders.append(Order(product, strike + competitive_addition  , buy_volume))
+                    new_orders.append(Order(product, strike, buy_volume))
                     buy_volume_total += buy_volume
                 else:
                     buy_volume = abs(inventory_limit - initial_inventory - buy_volume_total)
-                    new_orders.append(Order(product, strike + competitive_addition  , buy_volume))
+                    new_orders.append(Order(product, strike, buy_volume))
                     buy_volume_total += buy_volume
                     break
         
@@ -50,11 +51,11 @@ class Trader:
             if strike > new_bid:
                 sell_volume = lob_buy_volume_per_strike[lob_buy_strikes.index(strike)]
                 if abs(initial_inventory - sell_volume -sell_volume_total) <= inventory_limit:
-                    new_orders.append(Order(product, strike - competitive_addition  , -sell_volume))
+                    new_orders.append(Order(product, strike, -sell_volume))
                     sell_volume_total += sell_volume
                 else:
                     sell_volume = abs(initial_inventory + inventory_limit - sell_volume_total)
-                    new_orders.append(Order(product, strike - competitive_addition  , -sell_volume))
+                    new_orders.append(Order(product, strike, -sell_volume))
                     sell_volume_total += sell_volume
                     break
 
@@ -152,7 +153,7 @@ class Trader:
     
     def initialize(self, state: TradingState, product):
         """
-        Initialize and calculate all needed variables. I don't know how to use an __init__ ... 
+        Initialize and calculate all needed variables
         """
         inventory_limit = self.product_parameters[product]['inventory_limit']
         order_depth: OrderDepth = state.order_depths[product]   # Retrieve the Order Depth containing all the market BUY and SELL orders for PEARLS
@@ -178,7 +179,10 @@ class Trader:
                 lob_sell_strikes, lob_buy_volume_per_strike, lob_sell_volume_per_strike, inventory_limit,
                 lob_buy_volume_total, lob_sell_volume_total,best_bid,mid_price,best_ask)
     
-    def calculate_available_buy_and_sell(self,product, inventory_limit, initial_inventory, mod_1_buy_volume, mod_1_sell_volume):
+    def calculate_available_buy_and_sell(self, product, inventory_limit, initial_inventory, mod_1_buy_volume, mod_1_sell_volume):
+        """
+        Calculates the buy and sell orders still available taking the module 1 orders into account
+        """
         upper_bound = self.product_parameters[product]['upper_inventory_limit']
         lower_bound = self.product_parameters[product]['lower_inventory_limit']
 
@@ -195,7 +199,7 @@ class Trader:
     
     def get_current_inventory(self, state, product, position_changes):
         """
-        Just to clean up the trade_logic and make it more readable.
+        Just to clean up the trade_logic and make it more readable. This gets the current inventory
         """
         
         initial_inventory = state.position.get(product,0)  
@@ -205,7 +209,7 @@ class Trader:
     
     def get_target_inventory(self, product):
         """
-        Updates the target inventory.
+        Updates and returns the target inventory.
         """
         upper_bound = self.product_parameters[product]['upper_inventory_limit']
         lower_bound = self.product_parameters[product]['lower_inventory_limit']
@@ -213,11 +217,11 @@ class Trader:
 
         return target_inventory
     
-    def output_data(self,product, state,mod1,mod2,best_bid,mid_price,best_ask,smart_price_bid,smart_price,smart_price_ask):
+    def output_data(self, product, state, mod1, mod2, best_bid, mid_price, best_ask, smart_price_bid, smart_price, smart_price_ask):
         """
         Print data that is needed for the visualization tool. 
         """
-        print('\n')
+        #print('\n')
         time_stamp = state.timestamp
         order_depth = state.order_depths[product]
         buy_orders = order_depth.buy_orders
@@ -226,31 +230,11 @@ class Trader:
         market_previous_filled = state.market_trades.get(product,0)
         our_position = state.position.get(product,0)
         #best_bid ;{best_bid}|mid_price;{mid_price}|best_ask;{best_ask}|
-        print(f"time;{time_stamp}|product;{product}|smart_price_bid;{smart_price_bid}|smart_price;{smart_price}|smart_price_ask;{smart_price_ask}|our_postion;{our_position}| buy_orders;{buy_orders}| sell_orders;{sell_orders}| our_previous_filled;{our_previous_filled}| market_previous_filled;{market_previous_filled}")
+        #print(f"time;{time_stamp}|product;{product}|smart_price_bid;{smart_price_bid}|smart_price;{smart_price}|smart_price_ask;{smart_price_ask}|our_postion;{our_position}| buy_orders;{buy_orders}| sell_orders;{sell_orders}| our_previous_filled;{our_previous_filled}| market_previous_filled;{market_previous_filled}")
     
-    def calc_upper_lower_limit_based_on_trend(self,product):
-        """
-        look_back_period = self.look_back_period
-        moving_average_price = self.product_parameters[product]['smart_price_moving_average']
-        price_history = self.product_parameters[product]['smart_price_history']
-        product_limit = self.product_parameters[product]['inventory_limit']
-
-        if len(moving_average_price) >= look_back_period :
-            price_history = price_history[-look_back_period:]
-            moving_average_price  = moving_average_price[-look_back_period:]
-            percent_dec_above = len([1 for ph ,m_a_p in zip(price_history,moving_average_price) if ph > m_a_p])/look_back_period
-            adjuster_multiplier = 1 - percent_dec_above
-            inventory_bound = product_limit * percent_dec_above
-            if percent_dec_above >.5: #update lower bound
-                self.product_parameters[product]['lower_inventory_limit'] = inventory_bound
-                self.product_parameters[product]['upper_inventory_limit'] = product_limit
-
-            else: #update upper bound
-                self.product_parameters[product]['upper_inventory_limit'] = inventory_bound
-                self.product_parameters[product]['lower_inventory_limit'] = product_limit
-        
-        """
     
+    def calc_upper_lower_limit_based_on_trend(self, product):
+        pass
     
     
     
@@ -277,6 +261,7 @@ class Trader:
         best_bid,
         mid_price,
         best_ask) = market_variables
+        
 
         #CHECKS IF THERE ARE ORDERS ON BOTH SIDES OF THE ORDERBOOK
         if lob_buy_volume_total > 0 and lob_sell_volume_total > 0:
@@ -291,8 +276,7 @@ class Trader:
             self.save_price_data_and_vol(product, smart_price)
             
             #CALC BID/ASK
-            # smart_price_bid, smart_price_ask = self.calculate_bid_ask(smart_price, spread_size, product, current_inventory) 
-            smart_price_bid, smart_price_ask = self.calculate_bid_ask_dynamic(smart_price,best_bid,best_ask, lob_buy_strikes, lob_sell_strikes)
+            smart_price_bid, smart_price_ask = self.calculate_bid_ask_dynamic(smart_price, best_bid, best_ask, lob_buy_strikes, lob_sell_strikes)
             
             #MOD1 BUY AND SELL ORDERS 
             mod_1_new_orders, mod_1_buy_volume, mod_1_sell_volume = self.module_1_order_tapper(lob_buy_strikes, 
@@ -308,7 +292,7 @@ class Trader:
                                                                                                 )
             
             #AVAILABLE BUYS AND SELLS AFTER MOD 1 ORDERS ARE EXECUTED
-            avail_buy_orders, avail_sell_orders = self.calculate_available_buy_and_sell(product,inventory_limit, current_inventory, mod_1_buy_volume, mod_1_sell_volume)
+            avail_buy_orders, avail_sell_orders = self.calculate_available_buy_and_sell(product, inventory_limit, current_inventory, mod_1_buy_volume, mod_1_sell_volume)
             
             #CALCULATE CURRENT INVENTORY WITH MOD 1 ORDERS ALREADY INCLUDED
             current_inventory = self.get_current_inventory(state, product, (mod_1_buy_volume + mod_1_sell_volume))
@@ -322,12 +306,31 @@ class Trader:
                                                                                                 )
             
             #RETURN ALL ORDER DATA AND THE DATA NEEDED FOR VISUALIZATION
-            return mod_1_new_orders,mod_2_new_orders,best_bid,mid_price,best_ask,smart_price_bid,smart_price,smart_price_ask
+            return mod_1_new_orders, mod_2_new_orders, best_bid,mid_price, best_ask, smart_price_bid, smart_price, smart_price_ask
         
-        else:
-            # THIS IS WHAT HAPPENS WHEN ONE SIDE OF THE ORDERBOOK IS EMPTY (NO BIDS OR NO BUYS) -> WE WILL STILL NEED SOMETHING IN THAT CASE -> MAYBE ASK FOR RIDICULOUS PRICES? 
-            return []
+        elif lob_buy_volume_total > 0 and not lob_sell_volume_total > 0:
+            
+            ridiculous_sell_order = []
+            avail_buy_orders, avail_sell_orders = self.calculate_available_buy_and_sell(product, inventory_limit, current_inventory, 0, 0)
+            
+            sell_price = round(lob_average_buy * 1.005)
+            
+            ridiculous_sell_order.append(Order(product, sell_price, -avail_sell_orders))
+            
+            return ridiculous_sell_order
         
+        elif not lob_buy_volume_total > 0 and lob_sell_volume_total > 0:
+            
+            ridiculous_buy_order = []
+            avail_buy_orders, avail_sell_orders = self.calculate_available_buy_and_sell(product, inventory_limit, current_inventory, 0, 0)
+            
+            buy_price = round(lob_average_sell * 0.995)
+            
+            ridiculous_buy_order.append(Order(product, buy_price, avail_buy_orders))
+            
+            return ridiculous_buy_order
+            
+            
     def run(self, state: TradingState) -> Dict[str, List[Order]]:
         """
         Takes all buy and sell orders for all symbols as an input,
@@ -343,13 +346,13 @@ class Trader:
             market_variables = self.initialize(state, product)
             
             #EXECUTE THE TRADE LOGIC AND OUTPUTS ALL ORDERS + DATA NEEDED FOR VISUALIZATION
-            mod1,mod2,best_bid,mid_price,best_ask,smart_price_bid,smart_price,smart_price_ask = self.trade_logic(product,state,market_variables)
+            mod1, mod2, best_bid, mid_price, best_ask, smart_price_bid, smart_price, smart_price_ask = self.trade_logic(product, state, market_variables)
             
             #ADDS ALL ORDERS TO BE TRANSMITTED TO THE EMPTY DICT
             total_transmittable_orders[product] = mod1 + mod2
             
             #PRINTS THE OUTPUT DATA NEEDED FOR VISUALIZATION
-            self.output_data(product,state,mod1,mod2,best_bid,mid_price,best_ask,smart_price_bid,smart_price,smart_price_ask) 
+            self.output_data(product, state, mod1, mod2, best_bid, mid_price, best_ask, smart_price_bid, smart_price, smart_price_ask) 
         
         #RETURNS ALL ORDER DATA TO THE ENGINE
         return total_transmittable_orders
