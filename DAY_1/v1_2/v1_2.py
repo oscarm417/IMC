@@ -262,25 +262,17 @@ class Trader:
         #best_bid ;{best_bid}|mid_price;{mid_price}|best_ask;{best_ask}|
         #print(f"time;{time_stamp}|product;{product}|smart_price_bid;{smart_price_bid}|smart_price;{smart_price}|smart_price_ask;{smart_price_ask}|our_postion;{our_position}| buy_orders;{buy_orders}| sell_orders;{sell_orders}| our_previous_filled;{our_previous_filled}| market_previous_filled;{market_previous_filled}")
     
-    
+        
     def calc_upper_lower_limit_based_on_trend(self, product):
+        """
         
-        
-        
+        """
         if len(self.product_parameters[product]['smart_price_52_ema']) >= self.look_back_period:
-            if self.product_parameters[product]['macd_buy_sell_signal'][-1] >= 0.2:
-                self.product_parameters[product]['upper_inventory_limit'] = 20
-                self.product_parameters[product]['lower_inventory_limit'] = -15
-            elif self.product_parameters[product]['macd_buy_sell_signal'][-1] <= -0.2:
-                self.product_parameters[product]['upper_inventory_limit'] = 15
-                self.product_parameters[product]['lower_inventory_limit'] = -20
-            else:
-                if product == "BANANAS":
-                    self.product_parameters[product]['upper_inventory_limit'] = 20
-                    self.product_parameters[product]['lower_inventory_limit'] = -20
-                if product == "PEARLS":
-                    self.product_parameters[product]['upper_inventory_limit'] = 20
-                    self.product_parameters[product]['lower_inventory_limit'] = -20
+            
+            current_macd = self.product_parameters[product]['smart_price_macd'][-1]
+            
+            self.product_parameters[product]['upper_inventory_limit'] = max(min(20, 20 + round((current_macd + 0.75) * 50)), 0)
+            self.product_parameters[product]['lower_inventory_limit'] = min(max(-20, -20 + round((current_macd - 0.75) * 50)), 0)
         else:
             return
 
