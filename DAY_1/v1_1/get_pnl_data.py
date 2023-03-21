@@ -1,7 +1,7 @@
 import requests
 
 
-log = "" #uuid ONLY no .log no logs/
+log = "" 
 id_token = ""
 
 headers = {
