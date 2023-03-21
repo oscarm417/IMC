@@ -56,10 +56,10 @@ class Trader:
                     new_orders.append(Order(product, strike, -sell_volume))
                     sell_volume_total += sell_volume
                     break
-
+        
         return (new_orders, buy_volume_total, sell_volume_total)
 
-    def module_2_market_maker(self, product, smart_price_bid: int, smart_price_ask: int, avail_buy_orders: int, avail_sell_orders: int):
+    def module_2_market_maker(self, product: str, smart_price_bid: int, smart_price_ask: int, avail_buy_orders: int, avail_sell_orders: int):
         """
         Module for Market Making. This takes the bid/ask of the smart price and places orders at them.
         """
@@ -83,35 +83,43 @@ class Trader:
         
         return (new_orders, buy_volume, sell_volume)
     
-    def calculate_bid_ask_dynamic(self, smart_price, bid_price_1, ask_price_1, lob_buy_strikes, lob_sell_strikes):
+    def calculate_bid_ask(self, product: str, smart_price: float, lob_buy_strikes: list, lob_sell_strikes: list):
         """
         Calculates the the best available Bid/Ask price to maximize profit.
         """
         
         for idx, bid_strike in enumerate(list(reversed(lob_buy_strikes))):
             if smart_price > bid_strike and abs(smart_price - bid_strike) > 1:
-                smart_bid = bid_strike + 1
+                smart_price_bid = bid_strike + 1
                 break
             elif idx+1 == len(lob_buy_strikes):
-                smart_bid = m.floor(smart_price) - 1
+                smart_price_bid = m.floor(smart_price) - 1
                 break
         
         for idx, ask_strike in enumerate(lob_sell_strikes):
             if smart_price < ask_strike and abs(smart_price - ask_strike) > 1:
-                smart_ask = ask_strike - 1
+                smart_price_ask = ask_strike - 1
                 break
             elif idx+1 == len(lob_sell_strikes):
-                smart_ask = m.ceil(smart_price) + 1
+                smart_price_ask = m.ceil(smart_price) + 1
                 break
         
-        if smart_ask == ask_price_1 and smart_ask - 1 >= smart_price:
-            smart_ask -= 1
+        while smart_price_ask in lob_sell_strikes and smart_price_ask - 1 >= smart_price:
+            smart_price_ask -= 1
         
-        if smart_bid == bid_price_1 and smart_bid + 1 <= smart_price:
-            smart_bid += 1
+        while smart_price_bid in lob_buy_strikes and smart_price_bid + 1 <= smart_price:
+            smart_price_bid += 1
         
         
-        return smart_bid, smart_ask
+        if product == "PEARLS":
+            if smart_price_bid > self.product_parameters[product]['fair_price']:
+                smart_price_bid = self.product_parameters[product]['fair_price']
+            elif smart_price_ask < self.product_parameters[product]['fair_price']:
+                smart_price_ask = self.product_parameters[product]['fair_price']
+        
+        
+        
+        return smart_price_bid, smart_price_ask
     
     def calculate_smart_price(self, lob_average_buy: float, lob_average_sell: float, lob_buy_quantity: int, lob_sell_quantity: int) -> float:
         """
@@ -275,7 +283,8 @@ class Trader:
             self.save_price_data_and_vol(product, smart_price)
             
             #CALC BID/ASK
-            smart_price_bid, smart_price_ask = self.calculate_bid_ask_dynamic(smart_price, best_bid, best_ask, lob_buy_strikes, lob_sell_strikes)
+            smart_price_bid, smart_price_ask = self.calculate_bid_ask(product, smart_price, lob_buy_strikes, lob_sell_strikes)
+            
             
             #MOD1 BUY AND SELL ORDERS 
             mod_1_new_orders, mod_1_buy_volume, mod_1_sell_volume = self.module_1_order_tapper(lob_buy_strikes, 
@@ -328,8 +337,8 @@ class Trader:
             ridiculous_buy_order.append(Order(product, buy_price, avail_buy_orders))
             
             return ridiculous_buy_order
-            
-            
+        
+        
     def run(self, state: TradingState) -> Dict[str, List[Order]]:
         """
         Takes all buy and sell orders for all symbols as an input,
