@@ -74,7 +74,6 @@ class portfolio:
     def __repr__(self) -> str:
         return f"inventory: {self.inventory}\nAverage Holding Price {str(self.get_average_holding_price())}\nCurrent Trades: {[str(i)for i in self.open_trades]}"
 
-
 class Trader:
 
     def __init__(self):
@@ -149,7 +148,33 @@ class Trader:
         
         return (new_orders, buy_volume_total, sell_volume_total)
 
-    def module_2_market_maker(self, smart_price: float, product: str, smart_price_bid: int, smart_price_ask: int, avail_buy_orders: int, avail_sell_orders: int):
+    def module_2_take_profit(self, avail_buy_orders:int, avail_sell_orders:int, smart_price: float, product: str, smart_price_bid: int, smart_price_ask, inventory):
+        """
+        If we are max short and we currently have a profit if we buy at (ask)market then take the offer
+        if we are max long and we currently have a profit if we sell at (bid)market then take the offer
+        """
+        buy_volume = 0
+        sell_volume = 0
+        new_orders = []
+        #IN CASE STATE GETS RESET THEN DONT TRADE AS CALCULATION WILL BE OFF
+        if inventory == self.product_parameters[product]['portfolio'].inventory:
+            new_orders: list[Order] = []
+            average_holding_price = self.product_parameters[product]['portfolio'].get_average_holding_price()
+            #IF MAX SHORT
+            if inventory <= round(- 0.75 * self.product_parameters[product]['inventory_limit']) and average_holding_price > (smart_price_ask + 1):
+                price_to_buy = smart_price_ask + 1
+                new_orders.append(Order(product, price_to_buy, round(0.25 * avail_buy_orders)))
+                buy_volume = round(0.25 * avail_buy_orders)
+            
+            #IF MAX LONG
+            elif inventory >= round(0.75 * self.product_parameters[product]['inventory_limit']) and average_holding_price < (smart_price_bid - 1):
+                price_to_sell = smart_price_bid - 1
+                new_orders.append(Order(product, price_to_sell, -round(0.25 * avail_sell_orders)))
+                sell_volume = round(0.25 * avail_sell_orders)
+                
+        return new_orders, buy_volume, sell_volume
+
+    def module_3_market_maker(self, smart_price: float, product: str, smart_price_bid: int, smart_price_ask: int, avail_buy_orders: int, avail_sell_orders: int):
         """
         Module for Market Making. This takes the bid/ask of the smart price and places orders at them.
         """
@@ -159,27 +184,6 @@ class Trader:
         new_orders.append(Order(product, (smart_price_ask), -avail_sell_orders))
         
         return (new_orders)
-    
-    # def module_3_sell_at_market_if_profit(self, avail_buy_orders:int, avail_sell_orders:int, smart_price: float, product: str, smart_price_bid: int, smart_price_ask, bid_price_1, ask_price_1,inventory):
-    #     """
-    #     If we are max short and we currently have a profit if we buy at (ask)market then take the offer
-    #     if we are max long and we currently have a profit if we sell at (bid)market then take the offer
-    #     """
-    #     #IN CASE STATE GETS RESET THEN DONT TRADE AS CALCULATION WILL BE OFF
-    #     if inventory == self.product_paramters[product]['portfolio'].position:
-    #         new_orders: list[Order] = []
-    #         average_holding_price = self.product_parameters[product]['portfolio'].get_average_holding_price()
-    #         #IF MAX SHORT
-    #         if inventory == -self.product_parameters[product]['inventory_limit'] and average_holding_price > ask_price_1:
-    #             price_to_buy = max(smart_price_ask,ask_price_1)
-    #             new_orders.append(Order(product,(ask_price_1), avail_buy_orders))
-    #             avail_buy_orders = 0 
-    #         #IF MAX LONG
-    #         elif inventory == self.product_parameters[product]['inventory_limit'] and average_holding_price > bid_price_1:
-    #             price_to_sell = max(smart_price_bid,bid_price_1)
-    #             new_orders.append(Order(product,(bid_price_1), -avail_sell_orders))
-    #             avail_sell_orders
-    #     return new_orders, 
     
     def calculate_bid_ask(self, product: str, smart_price: float, lob_buy_strikes: list, lob_sell_strikes: list):
         """
@@ -192,6 +196,7 @@ class Trader:
                 break
             elif idx+1 == len(lob_buy_strikes):
                 smart_price_bid = m.floor(smart_price) - 1
+                print(product)
                 break
         
         for idx, ask_strike in enumerate(lob_sell_strikes):
@@ -200,6 +205,7 @@ class Trader:
                 break
             elif idx+1 == len(lob_sell_strikes):
                 smart_price_ask = m.ceil(smart_price) + 1
+                print(product)
                 break
         
         while smart_price_ask in lob_sell_strikes and smart_price_ask - 1 >= smart_price:
@@ -227,7 +233,7 @@ class Trader:
         
         return smart_price
     
-    def save_price_data_and_vol(self, product: str, smart_price: float, own_trades,inventory):
+    def save_price_data_and_vol(self, product: str, smart_price: float, own_trades, inventory):
         
         self.product_parameters[product]['smart_price_history'].append(smart_price)
         if own_trades != 0:
@@ -321,21 +327,22 @@ class Trader:
                 lob_sell_strikes, lob_buy_volume_per_strike, lob_sell_volume_per_strike, inventory_limit,
                 lob_buy_volume_total, lob_sell_volume_total,best_bid,mid_price,best_ask)
     
-    def calculate_available_buy_and_sell(self, product, inventory_limit, initial_inventory, mod_1_buy_volume, mod_1_sell_volume):
+    def calculate_available_buy_and_sell(self, product, inventory_limit, initial_inventory, buy_volume, sell_volume):
         """
         Calculates the buy and sell orders still available taking the module 1 orders into account
         """
         upper_bound = self.product_parameters[product]['upper_inventory_limit']
         lower_bound = self.product_parameters[product]['lower_inventory_limit']
 
-        if min(upper_bound,inventory_limit) - initial_inventory - mod_1_buy_volume < 0:
+        if min(upper_bound, inventory_limit) - initial_inventory - buy_volume < 0:
             avail_buy_orders = 0
         else:
-            avail_buy_orders = min(upper_bound,inventory_limit) - initial_inventory - mod_1_buy_volume
-        if abs(max(lower_bound, -inventory_limit)) + initial_inventory - mod_1_sell_volume < 0:
+            avail_buy_orders = min(upper_bound,inventory_limit) - initial_inventory - buy_volume
+            
+        if abs(max(lower_bound, -inventory_limit)) + initial_inventory - sell_volume < 0:
             avail_sell_orders = 0
         else:
-            avail_sell_orders = abs(max(lower_bound, -inventory_limit)) + initial_inventory - mod_1_sell_volume
+            avail_sell_orders = abs(max(lower_bound, -inventory_limit)) + initial_inventory - sell_volume
         
         return round(avail_buy_orders), round(avail_sell_orders)
     
@@ -359,11 +366,11 @@ class Trader:
 
         return target_inventory
     
-    def output_data(self, product, state, mod1, mod2, best_bid, mid_price, best_ask, smart_price_bid, smart_price, smart_price_ask):
+    def output_data(self, product, state, module_1_orders, module_2_orders, module_3_orders, best_bid, mid_price, best_ask, smart_price_bid, smart_price, smart_price_ask):
         """
         Print data that is needed for the visualization tool. 
         """
-        print('\n')
+        #print('\n')
         time_stamp = state.timestamp
         order_depth = state.order_depths[product]
         buy_orders = order_depth.buy_orders
@@ -372,7 +379,7 @@ class Trader:
         market_previous_filled = state.market_trades.get(product,0)
         our_position = state.position.get(product,0)
         #best_bid ;{best_bid}|mid_price;{mid_price}|best_ask;{best_ask}|
-        print(f"time;{time_stamp}|product;{product}|smart_price_bid;{smart_price_bid}|smart_price;{smart_price}|smart_price_ask;{smart_price_ask}|our_postion;{our_position}| buy_orders;{buy_orders}| sell_orders;{sell_orders}| our_previous_filled;{our_previous_filled}| market_previous_filled;{market_previous_filled}")
+        #print(f"time;{time_stamp}|product;{product}|smart_price_bid;{smart_price_bid}|smart_price;{smart_price}|smart_price_ask;{smart_price_ask}|our_postion;{our_position}| buy_orders;{buy_orders}| sell_orders;{sell_orders}| our_previous_filled;{our_previous_filled}| market_previous_filled;{market_previous_filled}")
     
     def calc_allmighty_banana_trend_indicator(self, product):
         """
@@ -393,8 +400,8 @@ class Trader:
         #UPDATES THE TARGET INVENTORY
         target_inventory = self.get_target_inventory(product)
         
-        #UPDATE THE CURRENT INVENTORY
-        current_inventory = self.get_current_inventory(state, product, 0)
+        #UPDATES THE INITIAL INVENTORY
+        initial_inventory = state.position.get(product, 0)
 
         #OWN TRADES TO TRACK CURRENT AVERAGE HOLDING PRICE 
         own_trades = state.own_trades.get(product,0)
@@ -425,7 +432,7 @@ class Trader:
                                                     lob_sell_quantity)
             
             #GET PRICE DATA AND CALC VOL
-            self.save_price_data_and_vol(product, smart_price,own_trades,current_inventory)
+            self.save_price_data_and_vol(product, smart_price, own_trades, initial_inventory)
             
             #CALC BID/ASK
             smart_price_bid, smart_price_ask = self.calculate_bid_ask(product, smart_price, lob_buy_strikes, lob_sell_strikes)
@@ -436,7 +443,7 @@ class Trader:
                                                                                                 lob_sell_strikes, 
                                                                                                 lob_buy_volume_per_strike, 
                                                                                                 lob_sell_volume_per_strike, 
-                                                                                                current_inventory, 
+                                                                                                initial_inventory, 
                                                                                                 inventory_limit, 
                                                                                                 product, 
                                                                                                 smart_price_bid, 
@@ -447,18 +454,21 @@ class Trader:
             self.calc_allmighty_banana_trend_indicator(product)
             
             #AVAILABLE BUYS AND SELLS AFTER MOD 1 ORDERS ARE EXECUTED
-            avail_buy_orders, avail_sell_orders = self.calculate_available_buy_and_sell(product, inventory_limit, current_inventory, mod_1_buy_volume, mod_1_sell_volume)
+            avail_buy_orders, avail_sell_orders = self.calculate_available_buy_and_sell(product, inventory_limit, initial_inventory, mod_1_buy_volume, mod_1_sell_volume)
             
             #CALCULATE CURRENT INVENTORY WITH MOD 1 ORDERS ALREADY INCLUDED
-            current_inventory = self.get_current_inventory(state, product, (mod_1_buy_volume + mod_1_sell_volume))
+            current_inventory = self.get_current_inventory(state, product, (mod_1_buy_volume - mod_1_sell_volume))
+
 
             #SELL IF MAXED AND WE CAN PROFIT BY EXITING POSITION AT MARKET VALUE
-            # self.module_3_sell_at_market_if_profit(avail_buy_orders,avail_sell_orders, smart_price, product, smart_price_bid, smart_price_ask, best_bid, best_ask ,state.position.get(product,0))
-
-
+            mod_2_new_orders, mod_2_buy_volume, mod_2_sell_volume = self.module_2_take_profit(avail_buy_orders, avail_sell_orders, smart_price, product, smart_price_bid, smart_price_ask, current_inventory)
+            
+            
+            avail_buy_orders, avail_sell_orders = self.calculate_available_buy_and_sell(product, inventory_limit, initial_inventory, (mod_1_buy_volume + mod_2_buy_volume), (mod_1_sell_volume + mod_2_sell_volume))
+            
             
             #MOD2 BUY AND SELL ORDERS
-            mod_2_new_orders = self.module_2_market_maker(smart_price,
+            mod_3_new_orders = self.module_3_market_maker(smart_price,
                                                         product, 
                                                         smart_price_bid, 
                                                         smart_price_ask, 
@@ -467,7 +477,7 @@ class Trader:
                                                         )
             
             #RETURN ALL ORDER DATA AND THE DATA NEEDED FOR VISUALIZATION
-            return mod_1_new_orders, mod_2_new_orders, best_bid,mid_price, best_ask, smart_price_bid, smart_price, smart_price_ask
+            return mod_1_new_orders, mod_2_new_orders, mod_3_new_orders, best_bid, mid_price, best_ask, smart_price_bid, smart_price, smart_price_ask
         
         elif lob_buy_volume_total > 0 and not lob_sell_volume_total > 0:
             
@@ -507,13 +517,13 @@ class Trader:
             market_variables = self.initialize(state, product)
             
             #EXECUTE THE TRADE LOGIC AND OUTPUTS ALL ORDERS + DATA NEEDED FOR VISUALIZATION
-            mod1, mod2, best_bid, mid_price, best_ask, smart_price_bid, smart_price, smart_price_ask = self.trade_logic(product, state, market_variables)
+            module_1_orders, module_2_orders, module_3_orders, best_bid, mid_price, best_ask, smart_price_bid, smart_price, smart_price_ask = self.trade_logic(product, state, market_variables)
             
             #ADDS ALL ORDERS TO BE TRANSMITTED TO THE EMPTY DICT
-            total_transmittable_orders[product] = mod1 + mod2
+            total_transmittable_orders[product] = module_1_orders + module_2_orders + module_3_orders
             
             #PRINTS THE OUTPUT DATA NEEDED FOR VISUALIZATION
-            self.output_data(product, state, mod1, mod2, best_bid, mid_price, best_ask, smart_price_bid, smart_price, smart_price_ask) 
+            #self.output_data(product, state, module_1_orders, module_2_orders, module_3_orders, best_bid, mid_price, best_ask, smart_price_bid, smart_price, smart_price_ask) 
         
         #RETURNS ALL ORDER DATA TO THE ENGINE
         return total_transmittable_orders
