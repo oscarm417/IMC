@@ -2,8 +2,9 @@ from typing import Dict, List
 from datamodel import OrderDepth, TradingState, Order
 import math as m
 import statistics as stat
-
 from collections import deque
+from collections import Counter
+
 
 class portfolio:
     def __init__(self):
@@ -11,13 +12,27 @@ class portfolio:
         self.previous_trades = set()
         self.open_trades = deque()
 
+    def convertToNumber (self,s):
+        return int.from_bytes(s.encode(), 'little')
+
+    def convertFromNumber (self,n):
+        return n.to_bytes(m.ceil(n.bit_length() / 8), 'little').decode()
+    
     def add_trade(self,list_of_trades):
+        #checking for duplicate trades 
+        trade_str = dict(Counter([str(i) for i in list_of_trades]))
+        trade_string_object = {str(i):i for i in list_of_trades}
+        for trade_str,c in trade_str.items():
+            temp_ob = trade_string_object[trade_str]
+            temp_ob.quantity = temp_ob.quantity*c
+            trade_string_object[trade_str] = temp_ob
+        list_of_trades = [v for k,v in trade_string_object.items()]
+
         for trade in list_of_trades:
-            if str(trade) not in self.previous_trades:
-                #adding string rep of trade to previous trade
-                trade.quantity = trade.quantity if (trade.buyer =="SUBMISSION") else -trade.quantity
-                #change quantity to negative  or positive on direction 
-                self.previous_trades.add(str(trade))
+            trade.quantity = trade.quantity if (trade.buyer =="SUBMISSION") else -trade.quantity
+            unique_trade_number = self.convertToNumber(str(trade))
+            if unique_trade_number not in self.previous_trades:
+                self.previous_trades.add(unique_trade_number)
                 if self.inventory == 0: 
                     #if inventory zero just add the trade 
                     self.open_trades.append(trade)
@@ -39,7 +54,7 @@ class portfolio:
                                 trade.quantity += currTrade.quantity
                             elif abs(currTrade.quantity) == abs(trade.quantity):
                                 trade.quantity = 0
-                        if trade.quantity > 0:
+                        if trade.quantity != 0:
                             self.open_trades.append(trade)
                 
         
@@ -61,6 +76,8 @@ class portfolio:
 
 
 
+
+    
 
     
 class Trader:
@@ -133,6 +150,27 @@ class Trader:
         
         return (new_orders)
     
+    # def module_3_sell_at_market_if_profit(self, avail_buy_orders:int, avail_sell_orders:int, smart_price: float, product: str, smart_price_bid: int, smart_price_ask, bid_price_1, ask_price_1,inventory):
+    #     """
+    #     If we are max short and we currently have a profit if we buy at (ask)market then take the offer
+    #     if we are max long and we currently have a profit if we sell at (bid)market then take the offer
+    #     """
+    #     #IN CASE STATE GETS RESET THEN DONT TRADE AS CALCULATION WILL BE OFF
+    #     if inventory == self.product_paramters[product]['portfolio'].position:
+    #         new_orders: list[Order] = []
+    #         average_holding_price = self.product_parameters[product]['portfolio'].get_average_holding_price()
+    #         #IF MAX SHORT
+    #         if inventory == -self.product_parameters[product]['inventory_limit'] and average_holding_price > ask_price_1:
+    #             price_to_buy = max(smart_price_ask,ask_price_1)
+    #             new_orders.append(Order(product,(ask_price_1), avail_buy_orders))
+    #             avail_buy_orders = 0 
+    #         #IF MAX LONG
+    #         elif inventory == self.product_parameters[product]['inventory_limit'] and average_holding_price > bid_price_1:
+    #             price_to_sell = max(smart_price_bid,bid_price_1)
+    #             new_orders.append(Order(product,(bid_price_1), -avail_sell_orders))
+    #             avail_sell_orders
+    #     return new_orders, 
+    
     def calculate_bid_ask(self, product: str, smart_price: float, lob_buy_strikes: list, lob_sell_strikes: list):
         """
         Calculates the the best available Bid/Ask price to maximize profit.
@@ -179,10 +217,13 @@ class Trader:
         
         return smart_price
     
-    def save_price_data_and_vol(self, product: str, smart_price: float):
+    def save_price_data_and_vol(self, product: str, smart_price: float, own_trades,inventory):
         
         self.product_parameters[product]['smart_price_history'].append(smart_price)
-        
+        if own_trades != 0:
+            self.product_parameters[product]['portfolio'].add_trade(own_trades)
+            self.product_parameters[product]['portfolio'].update_inventory()
+
         if len(self.product_parameters[product]['smart_price_history']) > 1 :
             if len(self.product_parameters[product]['smart_price_history']) > self.look_back_period:
                 del self.product_parameters[product]['smart_price_history'][0]
@@ -349,6 +390,9 @@ class Trader:
         #UPDATE THE CURRENT INVENTORY
         current_inventory = self.get_current_inventory(state, product, 0)
 
+        #OWN TRADES TO TRACK CURRENT AVERAGE HOLDING PRICE 
+        own_trades = state.own_trades.get(product,0)
+
         #DEFINE AND GET ALL NEEDED ORDERBOOK DATA
         (lob_average_buy, 
         lob_average_sell, 
@@ -365,7 +409,6 @@ class Trader:
         mid_price,
         best_ask) = market_variables
         
-
         #CHECKS IF THERE ARE ORDERS ON BOTH SIDES OF THE ORDERBOOK
         if lob_buy_volume_total > 0 and lob_sell_volume_total > 0:
             
@@ -376,7 +419,7 @@ class Trader:
                                                     lob_sell_quantity)
             
             #GET PRICE DATA AND CALC VOL
-            self.save_price_data_and_vol(product, smart_price)
+            self.save_price_data_and_vol(product, smart_price,own_trades,current_inventory)
             
             #CALC BID/ASK
             smart_price_bid, smart_price_ask = self.calculate_bid_ask(product, smart_price, lob_buy_strikes, lob_sell_strikes)
@@ -402,6 +445,11 @@ class Trader:
             
             #CALCULATE CURRENT INVENTORY WITH MOD 1 ORDERS ALREADY INCLUDED
             current_inventory = self.get_current_inventory(state, product, (mod_1_buy_volume + mod_1_sell_volume))
+
+            #SELL IF MAXED AND WE CAN PROFIT BY EXITING POSITION AT MARKET VALUE
+            # self.module_3_sell_at_market_if_profit(avail_buy_orders,avail_sell_orders, smart_price, product, smart_price_bid, smart_price_ask, best_bid, best_ask ,state.position.get(product,0))
+
+
             
             #MOD2 BUY AND SELL ORDERS
             mod_2_new_orders = self.module_2_market_maker(smart_price,
