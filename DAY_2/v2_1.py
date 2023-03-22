@@ -363,7 +363,7 @@ class Trader:
         """
         Print data that is needed for the visualization tool. 
         """
-        #print('\n')
+        print('\n')
         time_stamp = state.timestamp
         order_depth = state.order_depths[product]
         buy_orders = order_depth.buy_orders
@@ -372,21 +372,21 @@ class Trader:
         market_previous_filled = state.market_trades.get(product,0)
         our_position = state.position.get(product,0)
         #best_bid ;{best_bid}|mid_price;{mid_price}|best_ask;{best_ask}|
-        #print(f"time;{time_stamp}|product;{product}|smart_price_bid;{smart_price_bid}|smart_price;{smart_price}|smart_price_ask;{smart_price_ask}|our_postion;{our_position}| buy_orders;{buy_orders}| sell_orders;{sell_orders}| our_previous_filled;{our_previous_filled}| market_previous_filled;{market_previous_filled}")
+        print(f"time;{time_stamp}|product;{product}|smart_price_bid;{smart_price_bid}|smart_price;{smart_price}|smart_price_ask;{smart_price_ask}|our_postion;{our_position}| buy_orders;{buy_orders}| sell_orders;{sell_orders}| our_previous_filled;{our_previous_filled}| market_previous_filled;{market_previous_filled}")
     
-    def calc_upper_lower_limit_based_on_trend(self, product):
+    def calc_allmighty_banana_trend_indicator(self, product):
         """
-        Calculates the available bids/asks for module 2 to adjust in case of huge swings
+        Calculates the available bids/asks for module 2 to adjust in case of huge swings. Currently only works on BANANAS, hence the same
         """
-        if len(self.product_parameters[product]['smart_price_52_ema']) >= self.look_back_period:
+        if product == "BANANAS":
+            if len(self.product_parameters[product]['smart_price_52_ema']) >= self.look_back_period:
             
-            current_macd = self.product_parameters[product]['smart_price_macd'][-1]
+                current_macd = self.product_parameters[product]['smart_price_macd'][-1]
             
-            self.product_parameters[product]['upper_inventory_limit'] = max(min(20, 20 + round((current_macd + 0.75) * 50)), 0)
-            self.product_parameters[product]['lower_inventory_limit'] = min(max(-20, -20 + round((current_macd - 0.75) * 50)), 0)
-        else:
-            return
-    
+                self.product_parameters[product]['upper_inventory_limit'] = max(min(20, 20 + round((current_macd + 0.75) * 50)), 0)
+                self.product_parameters[product]['lower_inventory_limit'] = min(max(-20, -20 + round((current_macd - 0.75) * 50)), 0)
+            else:
+                return
     
     def trade_logic(self, product:str, state: TradingState, market_variables: list):
         
@@ -444,7 +444,7 @@ class Trader:
                                                                                                 smart_price
                                                                                                 )
             #ADJUST UPPER AND LOWER LIMIT
-            self.calc_upper_lower_limit_based_on_trend(product)
+            self.calc_allmighty_banana_trend_indicator(product)
             
             #AVAILABLE BUYS AND SELLS AFTER MOD 1 ORDERS ARE EXECUTED
             avail_buy_orders, avail_sell_orders = self.calculate_available_buy_and_sell(product, inventory_limit, current_inventory, mod_1_buy_volume, mod_1_sell_volume)
@@ -513,7 +513,7 @@ class Trader:
             total_transmittable_orders[product] = mod1 + mod2
             
             #PRINTS THE OUTPUT DATA NEEDED FOR VISUALIZATION
-            #self.output_data(product, state, mod1, mod2, best_bid, mid_price, best_ask, smart_price_bid, smart_price, smart_price_ask) 
+            self.output_data(product, state, mod1, mod2, best_bid, mid_price, best_ask, smart_price_bid, smart_price, smart_price_ask) 
         
         #RETURNS ALL ORDER DATA TO THE ENGINE
         return total_transmittable_orders
