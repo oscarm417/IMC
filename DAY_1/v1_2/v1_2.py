@@ -262,10 +262,9 @@ class Trader:
         #best_bid ;{best_bid}|mid_price;{mid_price}|best_ask;{best_ask}|
         #print(f"time;{time_stamp}|product;{product}|smart_price_bid;{smart_price_bid}|smart_price;{smart_price}|smart_price_ask;{smart_price_ask}|our_postion;{our_position}| buy_orders;{buy_orders}| sell_orders;{sell_orders}| our_previous_filled;{our_previous_filled}| market_previous_filled;{market_previous_filled}")
     
-        
     def calc_upper_lower_limit_based_on_trend(self, product):
         """
-        
+        Calculates the available bids/asks for module 2 to adjust in case of huge swings
         """
         if len(self.product_parameters[product]['smart_price_52_ema']) >= self.look_back_period:
             
@@ -275,7 +274,6 @@ class Trader:
             self.product_parameters[product]['lower_inventory_limit'] = min(max(-20, -20 + round((current_macd - 0.75) * 50)), 0)
         else:
             return
-
     
     
     def trade_logic(self, product:str, state: TradingState, market_variables: list):
