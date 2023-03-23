@@ -596,19 +596,19 @@ class Trader:
         ob_2 = state.order_depths[product_2]
         
         product_1_bid,product_1_mid,product_1_ask = self.bid_mid_ask(ob_1)
-        product_2_bid,product_2_mid,product_2_ask = self.bid_mid_ask(ob_1)
+        product_2_bid,product_2_mid,product_2_ask = self.bid_mid_ask(ob_2)
 
         spread = product_2_mid - (ratio*product_1_mid)
-        side = self.arb_pairs_parameters[pair_key]['side']
+        
         signal = self.zscore(spread,self.arb_pairs_parameters[pair_key]['mean'],self.arb_pairs_parameters[pair_key]['std'])
-
+        side = self.arb_pairs_parameters[pair_key]['side']
         
         #CURRENT INVENTORY & TARGET INVENTORY
         prod_1_target_inventory  = self.arb_pairs_parameters[pair_key]['position1']
         prod_2_target_inventory =  self.arb_pairs_parameters[pair_key]['position2']
         prod1_current_inventory = state.position.get(product_1,0)
         prod2_current_inventory = state.position.get(product_2,0)
-        print(f'side;{side}|signal;{signal}|spread;{spread}|product1_inventory;{prod1_current_inventory}|product2_inventory;{prod2_current_inventory}')
+        print(f'ratio;{ratio}|side;{side}|signal;{signal}|spread;{spread}|product1_inventory;{prod1_current_inventory}|product2_inventory;{prod2_current_inventory}|coco;{product_1_mid}|pina;{product_2_mid}')
 
         #HOW MUCH TO BUY AND SELLS
         #short_prodct_1,long_product_2        , long_product_1, short_product_2 
@@ -627,18 +627,26 @@ class Trader:
             # check to open/close spread trade 
             if signal <= -1 and side == 0: #Go long 
                 side = 1
+                self.arb_pairs_parameters[pair_key]['side'] = side
                 #buy prod2
                 #sell prod1
                 prod_1_needed, prod_2_needed = long_spread_sell_buys
+
+                self.arb_pairs_parameters[pair_key]['product1'] = prod_1_needed
+                self.arb_pairs_parameters[pair_key]['product2'] = prod_2_needed
                 prod1_orders = self.generate_market_orders(product_1, ob_1, -prod_1_needed)
                 prod2_orders = self.generate_market_orders(product_2, ob_2, prod_2_needed)
                 prod1_orders_to_send += prod1_orders
                 prod2_orders_to_send += prod2_orders
             elif side >= 1 and side == 0: #Go Short 
                 side = -1
+                self.arb_pairs_parameters[pair_key]['side'] = side
+                
                 #sell prod2
                 #buy prod1
                 prod_1_needed, prod_2_needed = short_spread_buy_sells
+                self.arb_pairs_parameters[pair_key]['product1'] = prod_1_needed
+                self.arb_pairs_parameters[pair_key]['product2'] = prod_2_needed
                 prod1_orders = self.generate_market_orders(product_1, ob_1, prod_1_needed)
                 prod2_orders = self.generate_market_orders(product_2, ob_2, -prod_2_needed)
                 prod1_orders_to_send += prod1_orders
@@ -646,8 +654,11 @@ class Trader:
 
             elif (signal >= 0 and  side == 1) or (signal <= 0 and  side == -1):#Close Long Position
                 side = 0 
+                self.arb_pairs_parameters[pair_key]['side'] = side
                 #sell prod2
                 #buy prod1
+                self.arb_pairs_parameters[pair_key]['product1'] = 0
+                self.arb_pairs_parameters[pair_key]['product2'] = 0
                 prod1_orders = self.generate_market_orders(product_1, ob_1, -prod1_current_inventory)
                 prod2_orders = self.generate_market_orders(product_2, ob_2, -prod2_current_inventory)
                 prod1_orders_to_send += prod1_orders
@@ -678,7 +689,7 @@ class Trader:
                 total_transmittable_orders[product] = mod1 + mod2
                 
                 #PRINTS THE OUTPUT DATA NEEDED FOR VISUALIZATION
-                self.output_data(product, state, mod1, mod2, best_bid, mid_price, best_ask, smart_price_bid, smart_price, smart_price_ask) 
+                # self.output_data(product, state, mod1, mod2, best_bid, mid_price, best_ask, smart_price_bid, smart_price, smart_price_ask) 
                 
                 
         
