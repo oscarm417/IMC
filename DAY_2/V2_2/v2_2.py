@@ -111,7 +111,7 @@ class Trader:
                                     'portfolio': portfolio()}
                                 }
         self.arb_pairs_parameters = {
-            "COCONUTS_PINA_COLADAS":{'ratio': 1.5512024480504607,'zscore':[],'signal':[],'side': 0 ,'position1':0,'position2':0}
+            "COCONUTS_PINA_COLADAS":{'ratio': 1.5512024480504607,'mean':2593.3223399315643,'std':30.53152286091472,'side': 0 ,'position1':0,'position2':0}
         }
         self.look_back_period = 52 #use float('inf') if you dont want this used
     
@@ -552,7 +552,7 @@ class Trader:
         ob_1_sells = sorted([[k,v] for k,v in ob_1.sell_orders.items()], key = lambda x: x[0], reverse = False )
         direction_1 = ob_1_sells if prod_1_needed > 0 else ( ob_1_buys if prod_1_needed < 0  else 0)
         if direction_1  != 0:
-            for price,volume in direction_1.items():
+            for price,volume in direction_1:
                 if prod_1_needed == 0:
                     break
                 if volume >= abs(prod_1_needed):
@@ -571,28 +571,44 @@ class Trader:
                         prod_1_needed -= volume 
         return market_orders_to_send
 
+    def zscore(self,val,avrg,stdv):
+        return (val - avrg) / stdv
 
+    def bid_mid_ask(self,ob):
+        ob_1_buys = sorted([[k,v] for k,v in ob.buy_orders.items()], key = lambda x: x[0], reverse = True )
+        ob_1_sells = sorted([[k,v] for k,v in ob.sell_orders.items()], key = lambda x: x[0], reverse = False )
+
+        bid = ob_1_buys[0][0]
+        ask = ob_1_sells[0][0]
+        mid = stat.mean([bid,ask])
+        return bid,mid,ask
     def arb_logic(self,state, product_1, product_2):
         """
         spread = product_2 - (product_1*ratio)
         long spread = buy - sell
         short spread = sell - long
         """
-        orders_to_send = []
+        prod1_orders_to_send = []
+        prod2_orders_to_send = []
         pair_key = product_1+"_"+product_2
         ratio = self.arb_pairs_parameters[pair_key]['ratio']
         ob_1 = state.order_depths[product_1] 
         ob_2 = state.order_depths[product_2]
+        
+        product_1_bid,product_1_mid,product_1_ask = self.bid_mid_ask(ob_1)
+        product_2_bid,product_2_mid,product_2_ask = self.bid_mid_ask(ob_1)
 
+        spread = product_2_mid - (ratio*product_1_mid)
         side = self.arb_pairs_parameters[pair_key]['side']
-        signal = self.arb_pairs_parameters[pair_key]['signal']
+        signal = self.zscore(spread,self.arb_pairs_parameters[pair_key]['mean'],self.arb_pairs_parameters[pair_key]['std'])
 
+        
         #CURRENT INVENTORY & TARGET INVENTORY
-        prod_1_target_inventory  = self.arb_pairs_parameters[pair_key][product_1]['position1']
-        prod_2_target_inventory =  self.arb_pairs_parameters[pair_key][product_2]['position2']
+        prod_1_target_inventory  = self.arb_pairs_parameters[pair_key]['position1']
+        prod_2_target_inventory =  self.arb_pairs_parameters[pair_key]['position2']
         prod1_current_inventory = state.position.get(product_1,0)
         prod2_current_inventory = state.position.get(product_2,0)
-        
+        print(f'side;{side}|signal;{signal}|spread;{spread}|product1_inventory;{prod1_current_inventory}|product2_inventory;{prod2_current_inventory}')
 
         #HOW MUCH TO BUY AND SELLS
         #short_prodct_1,long_product_2        , long_product_1, short_product_2 
@@ -604,7 +620,9 @@ class Trader:
             prod_2_needed = prod_2_target_inventory - prod2_current_inventory
             prod1_orders = self.generate_market_orders(product_1, ob_1, prod_1_needed)
             prod2_orders = self.generate_market_orders(product_2, ob_2, prod_2_needed)
-            orders_to_send += prod1_orders + prod2_orders
+    
+            prod1_orders_to_send += prod1_orders
+            prod2_orders_to_send += prod2_orders
         else:
             # check to open/close spread trade 
             if signal <= -1 and side == 0: #Go long 
@@ -614,7 +632,8 @@ class Trader:
                 prod_1_needed, prod_2_needed = long_spread_sell_buys
                 prod1_orders = self.generate_market_orders(product_1, ob_1, -prod_1_needed)
                 prod2_orders = self.generate_market_orders(product_2, ob_2, prod_2_needed)
-                orders_to_send += prod1_orders + prod2_orders
+                prod1_orders_to_send += prod1_orders
+                prod2_orders_to_send += prod2_orders
             elif side >= 1 and side == 0: #Go Short 
                 side = -1
                 #sell prod2
@@ -622,7 +641,8 @@ class Trader:
                 prod_1_needed, prod_2_needed = short_spread_buy_sells
                 prod1_orders = self.generate_market_orders(product_1, ob_1, prod_1_needed)
                 prod2_orders = self.generate_market_orders(product_2, ob_2, -prod_2_needed)
-                orders_to_send += prod1_orders + prod2_orders
+                prod1_orders_to_send += prod1_orders
+                prod2_orders_to_send += prod2_orders
 
             elif (signal >= 0 and  side == 1) or (signal <= 0 and  side == -1):#Close Long Position
                 side = 0 
@@ -630,8 +650,9 @@ class Trader:
                 #buy prod1
                 prod1_orders = self.generate_market_orders(product_1, ob_1, -prod1_current_inventory)
                 prod2_orders = self.generate_market_orders(product_2, ob_2, -prod2_current_inventory)
-                orders_to_send += prod1_orders + prod2_orders
-        return orders_to_send
+                prod1_orders_to_send += prod1_orders
+                prod2_orders_to_send += prod2_orders
+        return prod1_orders_to_send,prod2_orders_to_send
 
 
     def run(self, state: TradingState) -> Dict[str, List[Order]]:
@@ -658,13 +679,17 @@ class Trader:
                 
                 #PRINTS THE OUTPUT DATA NEEDED FOR VISUALIZATION
                 self.output_data(product, state, mod1, mod2, best_bid, mid_price, best_ask, smart_price_bid, smart_price, smart_price_ask) 
-        
+                
+                
         
         
         #STATS ARBITRAGE
         #SPREAD = PRODUCT2 - PRODUCT1*B
         if 'PINA_COLADAS' in state.order_depths.keys() and 'COCONUTS' in state.order_depths.keys():
-            self.arb_logic(self,state, 'COCONUTS', 'PINA_COLADAS')
+            o1, o2 = self.arb_logic(state, 'COCONUTS', 'PINA_COLADAS')
+            total_transmittable_orders['COCONUTS'] = o1
+            total_transmittable_orders['PINA_COLADAS'] = o2
+        
         
         #RETURNS ALL ORDER DATA TO THE ENGINE
         return total_transmittable_orders
