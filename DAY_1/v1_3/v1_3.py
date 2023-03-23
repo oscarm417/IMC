@@ -155,9 +155,9 @@ class Trader:
     #     If we are max short and we currently have a profit if we buy at (ask)market then take the offer
     #     if we are max long and we currently have a profit if we sell at (bid)market then take the offer
     #     """
+            # new_orders: list[Order] = []
     #     #IN CASE STATE GETS RESET THEN DONT TRADE AS CALCULATION WILL BE OFF
     #     if inventory == self.product_paramters[product]['portfolio'].position:
-    #         new_orders: list[Order] = []
     #         average_holding_price = self.product_parameters[product]['portfolio'].get_average_holding_price()
     #         #IF MAX SHORT
     #         if inventory == -self.product_parameters[product]['inventory_limit'] and average_holding_price > ask_price_1:
@@ -484,6 +484,10 @@ class Trader:
             ridiculous_buy_order.append(Order(product, buy_price, avail_buy_orders))
             
             return ridiculous_buy_order
+
+
+    # def stat_arb_logic(self,product_1_state,product_2_state):
+
         
         
     def run(self, state: TradingState) -> Dict[str, List[Order]]:
@@ -496,18 +500,24 @@ class Trader:
 
         #ITERATE OVER ALL AVAILABLE PRODUCTS IN THE ORDER DEPTHS
         for product in state.order_depths.keys():
-            
-            #DEFINE AND GET ALL ORDER BOOK DATA
-            market_variables = self.initialize(state, product)
-            
-            #EXECUTE THE TRADE LOGIC AND OUTPUTS ALL ORDERS + DATA NEEDED FOR VISUALIZATION
-            mod1, mod2, best_bid, mid_price, best_ask, smart_price_bid, smart_price, smart_price_ask = self.trade_logic(product, state, market_variables)
-            
-            #ADDS ALL ORDERS TO BE TRANSMITTED TO THE EMPTY DICT
-            total_transmittable_orders[product] = mod1 + mod2
-            
-            #PRINTS THE OUTPUT DATA NEEDED FOR VISUALIZATION
-            #self.output_data(product, state, mod1, mod2, best_bid, mid_price, best_ask, smart_price_bid, smart_price, smart_price_ask) 
+            if product in ['BANANAS','PEARLS']:
+                #DEFINE AND GET ALL ORDER BOOK DATA
+                market_variables = self.initialize(state, product)
+                
+                #EXECUTE THE TRADE LOGIC AND OUTPUTS ALL ORDERS + DATA NEEDED FOR VISUALIZATION
+                mod1, mod2, best_bid, mid_price, best_ask, smart_price_bid, smart_price, smart_price_ask = self.trade_logic(product, state, market_variables)
+                
+                #ADDS ALL ORDERS TO BE TRANSMITTED TO THE EMPTY DICT
+                total_transmittable_orders[product] = mod1 + mod2
+                
+                #PRINTS THE OUTPUT DATA NEEDED FOR VISUALIZATION
+                #self.output_data(product, state, mod1, mod2, best_bid, mid_price, best_ask, smart_price_bid, smart_price, smart_price_ask) 
         
+        coco_state = state['coco']
+        pin_state = state['pina']
+        arb_orders = self.stat_arb_logic(coco_state,pin_state)
+
+
+
         #RETURNS ALL ORDER DATA TO THE ENGINE
         return total_transmittable_orders
