@@ -24,7 +24,7 @@ class Trader:
                                     },
                                     
                                     'COCONUTS':{
-                                    'inventory_limit': 600, 'fair_price' : 8000,
+                                    'inventory_limit': 555, 'fair_price' : 8000,
                                     'smart_price_history':[], 'smart_price_52_ema':[],
                                     'smart_price_24_ema': [], 'smart_price_macd':[], 'smart_price_macd_signal_line': [],
                                     'macd_buy_sell_signal':[], 'percentage_change_history':[], 'perc_stdev_history':[],
@@ -32,7 +32,7 @@ class Trader:
                                     },
                                     
                                     'PINA_COLADAS':{
-                                    'inventory_limit': 300, 'fair_price' : 15000,
+                                    'inventory_limit': 296, 'fair_price' : 15000,
                                     'smart_price_history':[], 'smart_price_52_ema':[],
                                     'smart_price_24_ema': [], 'smart_price_macd':[], 'smart_price_macd_signal_line': [],
                                     'macd_buy_sell_signal':[], 'percentage_change_history':[], 'perc_stdev_history':[],
@@ -389,21 +389,24 @@ class Trader:
         product_1_orders: list[Order] = []
         product_2_orders: list[Order] = []
         
-        z_value_for_max_orders = 2
-        z_value_for_strategy_start = 0.5
+        z_score_for_max_orders = 2
+        z_score_for_strategy_start = 0.7
         
         pair_key = product_1+"_"+product_2
         
         product_1_order_multiplier = self.stat_arb_pair_parameters[pair_key]['coconuts_order_minimum']
         product_2_order_multiplier = self.stat_arb_pair_parameters[pair_key]['pina_coladas_order_minimum']
         
+        product_1_inventory_limit = self.product_parameters[product_1]['inventory_limit']
+        product_2_inventory_limit = self.product_parameters[product_2]['inventory_limit']
+        
         trade_opportunities = self.stat_arb_pair_parameters[pair_key]['trade_opportunities']
         
         product_1_max_orders = product_1_order_multiplier * trade_opportunities
         product_2_max_orders = product_2_order_multiplier * trade_opportunities
         
-        mean_ratio = self.stat_arb_pair_parameters[pair_key]['mean_ratio_backtest']
-        stdev_ratio = self.stat_arb_pair_parameters[pair_key]['stdev_ratio_backtest']
+        mean_ratio = self.stat_arb_pair_parameters[pair_key]['mean_ratio']
+        stdev_ratio = self.stat_arb_pair_parameters[pair_key]['stdev_ratio']
         
         order_depth_product_1: OrderDepth = state.order_depths[product_1]
         order_depth_product_2: OrderDepth = state.order_depths[product_2]
@@ -433,37 +436,32 @@ class Trader:
         z_score_mid = (current_mid_ratio - mean_ratio) / stdev_ratio
         
         
-        
-        
-        
-        
-        buy_opportunities_available_product_1 = m.fabs(m.fsum(order_depth_product_1.sell_orders.values()))
-        sell_opportunities_available_product_1 = m.fabs(m.fsum(order_depth_product_1.buy_orders.values()))
-        
-        buy_opportunities_available_product_2 = m.fabs(m.fsum(order_depth_product_2.sell_orders.values()))
-        sell_opportunities_available_product_2 = m.fabs(m.fsum(order_depth_product_2.buy_orders.values()))
-        
-        
-        if z_score_mid > z_value_for_strategy_start:
+        if z_score_mid > z_score_for_strategy_start:
             current_ratio = best_bid_product_2/best_ask_product_1
             z_score_actual = (current_ratio - mean_ratio) / stdev_ratio
             
-            if z_score_actual > z_value_for_strategy_start :
-                desired_position_product_1 = min((round((z_score_actual/z_value_for_max_orders) * trade_opportunities) * product_1_order_multiplier), product_1_max_orders)
-                desired_position_product_2 = - min((round((z_score_actual/z_value_for_max_orders) * trade_opportunities) * product_2_order_multiplier), product_2_max_orders)
+            if z_score_actual > z_score_for_strategy_start :
+                desired_position_product_1 = min((round((z_score_actual / (z_score_for_max_orders - z_score_for_strategy_start)) * trade_opportunities) * product_1_order_multiplier), product_1_max_orders)
+                desired_position_product_2 = - min((round((z_score_actual / (z_score_for_max_orders - z_score_for_strategy_start)) * trade_opportunities) * product_2_order_multiplier), product_2_max_orders)
+                if desired_position_product_1 >= product_1_inventory_limit:
+                    desired_position_product_1 = product_1_inventory_limit
+                    desired_position_product_2 = - product_2_inventory_limit
                 #print(z_score_mid, z_score_actual)
             else:
                 desired_position_product_1 = 0
                 desired_position_product_2 = 0
             
             
-        elif z_score_mid < - z_value_for_strategy_start:
+        elif z_score_mid < - z_score_for_strategy_start:
             current_ratio = best_ask_product_2/best_bid_product_1
             z_score_actual = (current_ratio - mean_ratio) / stdev_ratio
             
-            if z_score_actual < - z_value_for_strategy_start:
-                desired_position_product_1 = min((round((z_score_actual/z_value_for_max_orders) * trade_opportunities) * product_1_order_multiplier), product_1_max_orders)
-                desired_position_product_2 = -min((round((z_score_actual/z_value_for_max_orders) * trade_opportunities) * product_2_order_multiplier), product_2_max_orders)
+            if z_score_actual < - z_score_for_strategy_start:
+                desired_position_product_1 = min((round((z_score_actual / (z_score_for_max_orders - z_score_for_strategy_start)) * trade_opportunities) * product_1_order_multiplier), product_1_max_orders)
+                desired_position_product_2 = -min((round((z_score_actual / (z_score_for_max_orders - z_score_for_strategy_start)) * trade_opportunities) * product_2_order_multiplier), product_2_max_orders)
+                if desired_position_product_2 >= product_2_inventory_limit:
+                    desired_position_product_1 = - product_1_inventory_limit
+                    desired_position_product_2 = product_2_inventory_limit
                 #print(z_score_mid, z_score_actual)
             else:
                 desired_position_product_1 = 0
@@ -503,9 +501,6 @@ class Trader:
                 product_2_orders.append(Order(product_2, best_ask_product_2, min((available_units * product_2_order_multiplier), abs(desired_position_product_2 - initial_position_product_2))))
         
         
-        #print(initial_position_product_1, desired_position_product_1, initial_position_product_2, desired_position_product_2)
-        
-        #print (best_bid_volume_product_1, best_bid_avail_units_product_1, best_ask_volume_product_1, best_ask_avail_units_product_1)
         
         return product_1_orders, product_2_orders
     
@@ -538,7 +533,6 @@ class Trader:
         
         
         #STATS ARBITRAGE
-        #SPREAD = PRODUCT2 - PRODUCT1*B
         if 'PINA_COLADAS' in state.order_depths.keys() and 'COCONUTS' in state.order_depths.keys():
             product_1_orders, product_2_orders = self.stat_arb_trade_logic(state, 'COCONUTS', 'PINA_COLADAS')
             
