@@ -389,7 +389,7 @@ class Trader:
         product_1_orders: list[Order] = []
         product_2_orders: list[Order] = []
         
-        z_score_for_max_orders = 2
+        z_score_for_max_orders = 1.5
         z_score_for_strategy_start = 0.7
         
         pair_key = product_1+"_"+product_2
