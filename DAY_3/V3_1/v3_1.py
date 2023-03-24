@@ -245,7 +245,7 @@ class Trader:
     
     def get_current_inventory(self, state: TradingState, product: str, position_changes: int):
         """
-        Just to clean up the market_making_trade_logic and make it more readable. This gets the current inventory
+        Just to clean up the pearls_bananas_trade_logic and make it more readable. This gets the current inventory
         """
         
         initial_inventory = state.position.get(product,0)  
@@ -278,11 +278,11 @@ class Trader:
         #best_bid ;{best_bid}|mid_price;{mid_price}|best_ask;{best_ask}|
         #print(f"time;{time_stamp}|product;{product}|smart_price_bid;{smart_price_bid}|smart_price;{smart_price}|smart_price_ask;{smart_price_ask}|our_postion;{our_position}| buy_orders;{buy_orders}| sell_orders;{sell_orders}| our_previous_filled;{our_previous_filled}| market_previous_filled;{market_previous_filled}")
     
-    def calc_allmighty_banana_trend_indicator(self, product: str):
+    def calc_allmighty_trend_indicator(self, product: str):
         """
         Calculates the available bids/asks for module 2 to adjust in case of huge swings. Currently only works on BANANAS, hence the same
         """
-        if product == "BANANAS":
+        if product == "PUT YOUR PRODUCT HERE":
             if len(self.product_parameters[product]['smart_price_52_ema']) >= self.look_back_period:
             
                 current_macd = self.product_parameters[product]['smart_price_macd'][-1]
@@ -292,7 +292,7 @@ class Trader:
             else:
                 return
     
-    def market_making_trade_logic(self, product:str, state: TradingState, market_variables: list):
+    def pearls_bananas_trade_logic(self, product:str, state: TradingState, market_variables: list):
         """
         Market making logic for Bananas and Pearls only currently. 
         Defining Smart_price, setting a bid/ask from there, clearing all orders in between and pushing all remaining orders to the bid/ask. Works like a charm
@@ -346,7 +346,7 @@ class Trader:
                                                                                                 smart_price
                                                                                                 )
             #ADJUST UPPER AND LOWER LIMIT
-            self.calc_allmighty_banana_trend_indicator(product)
+            self.calc_allmighty_trend_indicator(product)
             
             #AVAILABLE BUYS AND SELLS AFTER MOD 1 ORDERS ARE EXECUTED
             avail_buy_orders, avail_sell_orders = self.calculate_available_buy_and_sell(product, inventory_limit, initial_inventory, mod_1_buy_volume, mod_1_sell_volume)
@@ -388,7 +388,7 @@ class Trader:
             
             return ridiculous_buy_order
     
-    def stat_arb_trade_logic(self, state: TradingState, product_1: str, product_2: str):
+    def pina_coco_trade_logic(self, state: TradingState, product_1: str, product_2: str):
         """
         Product 2 is always the product which needs to be more expensive. That is how the mean ratio is currently defined.
         If z-Score is positive that means current ratio is bigger than mean. We should then go long in product_1 and short in product_2
@@ -530,7 +530,7 @@ class Trader:
                 market_variables = self.initialize(state, product)
                 
                 #EXECUTE THE TRADE LOGIC AND OUTPUTS ALL ORDERS + DATA NEEDED FOR VISUALIZATION
-                mod1, mod2, best_bid, mid_price, best_ask, smart_price_bid, smart_price, smart_price_ask = self.market_making_trade_logic(product, state, market_variables)
+                mod1, mod2, best_bid, mid_price, best_ask, smart_price_bid, smart_price, smart_price_ask = self.pearls_bananas_trade_logic(product, state, market_variables)
                 
                 #ADDS ALL ORDERS TO BE TRANSMITTED TO THE EMPTY DICT
                 total_transmittable_orders[product] = mod1 + mod2
@@ -543,7 +543,7 @@ class Trader:
         
         #STATS ARBITRAGE
         if 'PINA_COLADAS' in state.order_depths.keys() and 'COCONUTS' in state.order_depths.keys():
-            product_1_orders, product_2_orders = self.stat_arb_trade_logic(state, 'COCONUTS', 'PINA_COLADAS')
+            product_1_orders, product_2_orders = self.pina_coco_trade_logic(state, 'COCONUTS', 'PINA_COLADAS')
             
             total_transmittable_orders['COCONUTS'] = product_1_orders
             total_transmittable_orders['PINA_COLADAS'] = product_2_orders
