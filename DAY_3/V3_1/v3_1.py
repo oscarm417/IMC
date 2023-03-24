@@ -14,6 +14,9 @@ class Trader:
 
                                     'BANANAS':{
                                     'inventory_limit': 20, 'fair_price' : 5000,
+                                    'smart_price_history':[], 'smart_price_52_ema':[],
+                                    'smart_price_24_ema': [], 'smart_price_macd':[], 'smart_price_macd_signal_line': [],
+                                    'macd_buy_sell_signal':[], 'percentage_change_history':[], 'perc_stdev_history':[],
                                     'lower_inventory_limit': -20, 'upper_inventory_limit': 20
                                     },
                                     
@@ -29,17 +32,20 @@ class Trader:
                                     
                                     'DIVING_GEAR':{
                                     'inventory_limit': 50, 'fair_price' : 0,
-                                    'lower_inventory_limit': -300, 'upper_inventory_limit': 300
+                                    'lower_inventory_limit': -50, 'upper_inventory_limit': 50
                                     },
                                     
                                     'BERRIES':{
                                     'inventory_limit': 250, 'fair_price' : 0,
-                                    'lower_inventory_limit': -300, 'upper_inventory_limit': 300
+                                    'smart_price_history':[], 'smart_price_52_ema':[],
+                                    'smart_price_24_ema': [], 'smart_price_macd':[], 'smart_price_macd_signal_line': [],
+                                    'macd_buy_sell_signal':[], 'percentage_change_history':[], 'perc_stdev_history':[],
+                                    'lower_inventory_limit': -250, 'upper_inventory_limit': 250
                                     },
                                     
                                     'DOLPHIN_SIGHTINGS':{
                                     'inventory_limit': 0, 'fair_price' : 0,
-                                    'lower_inventory_limit': -300, 'upper_inventory_limit': 300
+                                    'lower_inventory_limit': 0, 'upper_inventory_limit': 0
                                     },
                                 }
         self.stat_arb_pair_parameters = {
