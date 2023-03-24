@@ -462,7 +462,7 @@ class Trader:
             z_score_actual = (current_ratio - mean_ratio) / stdev_ratio
             
             if z_score_actual < - z_value_for_strategy_start:
-                desired_position_product_1 = - min((round((z_score_actual/z_value_for_max_orders) * trade_opportunities) * product_1_order_multiplier), product_1_max_orders)
+                desired_position_product_1 = min((round((z_score_actual/z_value_for_max_orders) * trade_opportunities) * product_1_order_multiplier), product_1_max_orders)
                 desired_position_product_2 = min((round((z_score_actual/z_value_for_max_orders) * trade_opportunities) * product_2_order_multiplier), product_2_max_orders)
                 #print(z_score_mid, z_score_actual)
             else:
@@ -496,7 +496,6 @@ class Trader:
             
             
         elif initial_position_product_1 <= 0 and z_score_mid < 0:
-            print(initial_position_product_1, desired_position_product_1)
             if initial_position_product_1 > desired_position_product_1:
                 #add more, short 1 long 2
                 available_units = min(best_bid_avail_units_product_1, best_ask_avail_units_product_2)
