@@ -85,7 +85,7 @@ class Trader:
         
         return (new_orders, buy_volume_total, sell_volume_total)
 
-    def module_2_market_maker(self, smart_price: float, product: str, smart_price_bid: int, smart_price_ask: int, avail_buy_orders: int, avail_sell_orders: int):
+    def module_2_market_maker(self, product: str, smart_price_bid: int, smart_price_ask: int, avail_buy_orders: int, avail_sell_orders: int):
         """
         Module for Market Making. This takes the bid/ask of the smart price and places orders at them.
         """
@@ -233,7 +233,7 @@ class Trader:
         
         return round(avail_buy_orders), round(avail_sell_orders)
     
-    def pearls_bananas_trade_logic(self, product: str, state: TradingState):
+    def pearls_bananas_berries_trade_logic(self, product: str, state: TradingState):
         """
         Market making logic for Bananas and Pearls only. 
         Defining Smart_price, setting a bid/ask from there, clearing all orders in between and pushing all remaining orders to the bid/ask. Works like a charm
@@ -284,8 +284,7 @@ class Trader:
             avail_buy_orders, avail_sell_orders = self.calculate_available_buy_and_sell(product, inventory_limit, initial_inventory, mod_1_buy_volume, mod_1_sell_volume)
             
             #MOD2 BUY AND SELL ORDERS
-            mod_2_new_orders = self.module_2_market_maker(smart_price,
-                                                        product, 
+            mod_2_new_orders = self.module_2_market_maker(product, 
                                                         smart_price_bid, 
                                                         smart_price_ask, 
                                                         avail_buy_orders, 
@@ -555,7 +554,14 @@ class Trader:
         
         
         return diving_gear_orders
-        
+    
+    
+    
+    
+    
+    
+    
+    
     
     def run(self, state: TradingState) -> Dict[str, List[Order]]:
         """
@@ -566,8 +572,7 @@ class Trader:
         total_transmittable_orders = {}
 
         
-        #MARKET MAKING 
-        #ITERATE OVER ALL AVAILABLE PRODUCTS IN THE ORDER DEPTHS
+        #MARKET MAKING
         for product in state.order_depths.keys():
             if product in ['PEARLS','BANANAS', 'BERRIES']:
                 
@@ -586,7 +591,7 @@ class Trader:
             total_transmittable_orders['PINA_COLADAS'] = product_2_orders
         
         
-        #All-In Wombo-Combo
+        #ALL-IN WOMBO-COMBO
         if 'DIVING_GEAR' in state.order_depths.keys() and 'DOLPHIN_SIGHTINGS' in state.observations.keys():
             
             diving_gear_orders = self.diving_gear_dolphins_trade_logic(state, 'DIVING_GEAR', 'DOLPHIN_SIGHTINGS')
