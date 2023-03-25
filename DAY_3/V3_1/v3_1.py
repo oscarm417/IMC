@@ -14,9 +14,6 @@ class Trader:
 
                                     'BANANAS':{
                                     'inventory_limit': 20, 'fair_price' : 5000,
-                                    'smart_price_history':[], 'smart_price_52_ema':[],
-                                    'smart_price_24_ema': [], 'smart_price_macd':[], 'smart_price_macd_signal_line': [],
-                                    'macd_buy_sell_signal':[], 'percentage_change_history':[], 'perc_stdev_history':[],
                                     'lower_inventory_limit': -20, 'upper_inventory_limit': 20
                                     },
                                     
@@ -31,28 +28,25 @@ class Trader:
                                     },
                                     
                                     'DIVING_GEAR':{
-                                    'inventory_limit': 50, 'fair_price' : 0,
+                                    'inventory_limit': 50, 'buy_sell_signal': 0,
+                                    'mid_price_ema':[], 'ema_count': 0,
                                     'lower_inventory_limit': -50, 'upper_inventory_limit': 50
                                     },
                                     
                                     'BERRIES':{
                                     'inventory_limit': 250, 'fair_price' : 0,
-                                    'smart_price_history':[], 'smart_price_52_ema':[],
-                                    'smart_price_24_ema': [], 'smart_price_macd':[], 'smart_price_macd_signal_line': [],
-                                    'macd_buy_sell_signal':[], 'percentage_change_history':[], 'perc_stdev_history':[],
                                     'lower_inventory_limit': -250, 'upper_inventory_limit': 250
                                     },
                                     
                                     'DOLPHIN_SIGHTINGS':{
-                                    'inventory_limit': 0, 'fair_price' : 0,
-                                    'lower_inventory_limit': 0, 'upper_inventory_limit': 0
+                                    'last_sightings': 0
                                     },
                                 }
         self.stat_arb_pair_parameters = {
-            "COCONUTS_PINA_COLADAS":{'mean_ratio': 1.875, 'stdev_ratio': 0.00471349164360403, 'mean_ratio_backtest': 1.874649044228040, 'stdev_ratio_backtest': 0.0014590944891508,
+            "COCONUTS_PINA_COLADAS":{'mean_ratio': 1.875, 'stdev_ratio': 0.00447052512964639, 'mean_ratio_backtest': 1.874649044228040, 'stdev_ratio_backtest': 0.0014590944891508,
                                     'coconuts_order_minimum': 15, 'pina_coladas_order_minimum': 8, 'trade_opportunities': 37}
         }
-        self.look_back_period = float('inf') #use float('inf') if you dont want this used
+        self.look_back_period_diving_gear = 500 #use float('inf') if you dont want this used
     
     def module_1_order_tapper(self, lob_buy_strikes, lob_sell_strikes, lob_buy_volume_per_strike, lob_sell_volume_per_strike, initial_inventory, inventory_limit, product, new_bid, new_ask, smart_price):
         """
@@ -142,60 +136,61 @@ class Trader:
     
     def save_price_data_and_vol(self, product: str, smart_price: float, inventory):
         
-        self.product_parameters[product]['smart_price_history'].append(smart_price)
-        
-        if len(self.product_parameters[product]['smart_price_history']) > 1 :
-            if len(self.product_parameters[product]['smart_price_history']) > self.look_back_period:
-                del self.product_parameters[product]['smart_price_history'][0]
-                del self.product_parameters[product]['percentage_change_history'][0]
-                del self.product_parameters[product]['perc_stdev_history'][0]
-                del self.product_parameters[product]['smart_price_52_ema'][0]
-                del self.product_parameters[product]['smart_price_24_ema'][0]
-                del self.product_parameters[product]['smart_price_macd'][0]
-                del self.product_parameters[product]['smart_price_macd_signal_line'][0]
-                del self.product_parameters[product]['macd_buy_sell_signal'][0]
+        if product in ['DIVING_GEAR']:
+            self.product_parameters[product]['smart_price_history'].append(smart_price)
+            
+            if len(self.product_parameters[product]['smart_price_history']) > 1 :
+                if len(self.product_parameters[product]['smart_price_history']) > self.look_back_period:
+                    del self.product_parameters[product]['smart_price_history'][0]
+                    del self.product_parameters[product]['percentage_change_history'][0]
+                    del self.product_parameters[product]['perc_stdev_history'][0]
+                    del self.product_parameters[product]['smart_price_52_ema'][0]
+                    del self.product_parameters[product]['smart_price_24_ema'][0]
+                    del self.product_parameters[product]['smart_price_macd'][0]
+                    del self.product_parameters[product]['smart_price_macd_signal_line'][0]
+                    del self.product_parameters[product]['macd_buy_sell_signal'][0]
+                    
                 
-            
-            percentage_change = m.log(self.product_parameters[product]['smart_price_history'][-1] / self.product_parameters[product]['smart_price_history'][-2])
-            self.product_parameters[product]['percentage_change_history'].append(percentage_change)
-            
-            perc_standard_deviation = stat.stdev([x for x in self.product_parameters[product]['percentage_change_history']])
-            self.product_parameters[product]['perc_stdev_history'].append(perc_standard_deviation)
-            
-            k_52 = 2 / (min(len(self.product_parameters[product]['smart_price_history']), 52) + 1)
-            exp_moving_ave_52 = (smart_price * k_52) + self.product_parameters[product]['smart_price_52_ema'][-1] * (1 - k_52)
-            self.product_parameters[product]['smart_price_52_ema'].append(exp_moving_ave_52)
-            
-            k_24 = 2 / (min(len(self.product_parameters[product]['smart_price_history']), 24) + 1)
-            exp_moving_ave_24 = (smart_price * k_24) + self.product_parameters[product]['smart_price_24_ema'][-1] * (1 - k_24)
-            self.product_parameters[product]['smart_price_24_ema'].append(exp_moving_ave_24)
-            
-            MACD = self.product_parameters[product]['smart_price_24_ema'][-1] - self.product_parameters[product]['smart_price_52_ema'][-1]
-            self.product_parameters[product]['smart_price_macd'].append(MACD)
-            
-            k_signal = 2 / (min(len(self.product_parameters[product]['smart_price_history']), 18) + 1)
-            macd_signal_line = (MACD * k_signal) + self.product_parameters[product]['smart_price_macd_signal_line'][-1] * (1 - k_signal)
-            self.product_parameters[product]['smart_price_macd_signal_line'].append(macd_signal_line)
-            
-            macd_buy_sell_signal = MACD - macd_signal_line
-            self.product_parameters[product]['macd_buy_sell_signal'].append(macd_buy_sell_signal)
-            
-            
-        elif len(self.product_parameters[product]['smart_price_history']) <= 1 :
-            percentage_change = 0
-            perc_standard_deviation = 0
-            exp_moving_ave_52 = smart_price
-            exp_moving_ave_24 = smart_price
-            MACD = 0
-            macd_signal_line = 0
-            macd_buy_sell_signal = 0
-            self.product_parameters[product]['percentage_change_history'].append(percentage_change)
-            self.product_parameters[product]['perc_stdev_history'].append(perc_standard_deviation)
-            self.product_parameters[product]['smart_price_52_ema'].append(exp_moving_ave_52)
-            self.product_parameters[product]['smart_price_24_ema'].append(exp_moving_ave_24)
-            self.product_parameters[product]['smart_price_macd'].append(MACD)
-            self.product_parameters[product]['smart_price_macd_signal_line'].append(macd_signal_line)
-            self.product_parameters[product]['macd_buy_sell_signal'].append(macd_buy_sell_signal)
+                percentage_change = m.log(self.product_parameters[product]['smart_price_history'][-1] / self.product_parameters[product]['smart_price_history'][-2])
+                self.product_parameters[product]['percentage_change_history'].append(percentage_change)
+                
+                perc_standard_deviation = stat.stdev([x for x in self.product_parameters[product]['percentage_change_history']])
+                self.product_parameters[product]['perc_stdev_history'].append(perc_standard_deviation)
+                
+                k_52 = 2 / (min(len(self.product_parameters[product]['smart_price_history']), 52) + 1)
+                exp_moving_ave_52 = (smart_price * k_52) + self.product_parameters[product]['smart_price_52_ema'][-1] * (1 - k_52)
+                self.product_parameters[product]['smart_price_52_ema'].append(exp_moving_ave_52)
+                
+                k_24 = 2 / (min(len(self.product_parameters[product]['smart_price_history']), 24) + 1)
+                exp_moving_ave_24 = (smart_price * k_24) + self.product_parameters[product]['smart_price_24_ema'][-1] * (1 - k_24)
+                self.product_parameters[product]['smart_price_24_ema'].append(exp_moving_ave_24)
+                
+                MACD = self.product_parameters[product]['smart_price_24_ema'][-1] - self.product_parameters[product]['smart_price_52_ema'][-1]
+                self.product_parameters[product]['smart_price_macd'].append(MACD)
+                
+                k_signal = 2 / (min(len(self.product_parameters[product]['smart_price_history']), 18) + 1)
+                macd_signal_line = (MACD * k_signal) + self.product_parameters[product]['smart_price_macd_signal_line'][-1] * (1 - k_signal)
+                self.product_parameters[product]['smart_price_macd_signal_line'].append(macd_signal_line)
+                
+                macd_buy_sell_signal = MACD - macd_signal_line
+                self.product_parameters[product]['macd_buy_sell_signal'].append(macd_buy_sell_signal)
+                
+                
+            elif len(self.product_parameters[product]['smart_price_history']) <= 1 :
+                percentage_change = 0
+                perc_standard_deviation = 0
+                exp_moving_ave_52 = smart_price
+                exp_moving_ave_24 = smart_price
+                MACD = 0
+                macd_signal_line = 0
+                macd_buy_sell_signal = 0
+                self.product_parameters[product]['percentage_change_history'].append(percentage_change)
+                self.product_parameters[product]['perc_stdev_history'].append(perc_standard_deviation)
+                self.product_parameters[product]['smart_price_52_ema'].append(exp_moving_ave_52)
+                self.product_parameters[product]['smart_price_24_ema'].append(exp_moving_ave_24)
+                self.product_parameters[product]['smart_price_macd'].append(MACD)
+                self.product_parameters[product]['smart_price_macd_signal_line'].append(macd_signal_line)
+                self.product_parameters[product]['macd_buy_sell_signal'].append(macd_buy_sell_signal)
     
     def initialize(self, state: TradingState, product):
         """
@@ -211,19 +206,14 @@ class Trader:
         lob_sell_volume_per_strike = [-x for x in list(order_depth.sell_orders.values())]        # Returns a list of volumes for the lob_sell_strikes --> positive & low to high strikes
         lob_buy_strikes_w_vol = [lob_buy_strikes[lob_buy_volume_per_strike.index(x)] for x in lob_buy_volume_per_strike for i in range(x)]      # Returns a list of all buy strikes with the amount of strikes in the list given by their quantity in lob_buy_volume_per_strike
         lob_sell_strikes_w_vol = [lob_sell_strikes[lob_sell_volume_per_strike.index(x)] for x in lob_sell_volume_per_strike for i in range(x)]      # Returns a list of all sell strikes with the amount of strikes in the list given by their quantity in lob_sell_volume_per_strike
-        #lob_all_strikes_w_vol = lob_buy_strikes_w_vol + lob_sell_strikes_w_vol
         lob_average_buy = stat.fmean(lob_buy_strikes_w_vol)
         lob_average_sell = stat.fmean(lob_sell_strikes_w_vol)
         lob_buy_quantity = sum(lob_buy_volume_per_strike)
         lob_sell_quantity = sum(lob_sell_volume_per_strike) 
-        best_ask = min(order_depth.sell_orders.keys())
-        best_bid = max(order_depth.buy_orders.keys())
-        mid_price = (best_ask + best_bid) / 2 
-        #current_timestamp = state.timestamp
 
         return (lob_average_buy, lob_average_sell, lob_buy_quantity, lob_sell_quantity, lob_buy_strikes, 
                 lob_sell_strikes, lob_buy_volume_per_strike, lob_sell_volume_per_strike, inventory_limit,
-                lob_buy_volume_total, lob_sell_volume_total,best_bid,mid_price,best_ask)
+                lob_buy_volume_total, lob_sell_volume_total)
     
     def calculate_available_buy_and_sell(self, product: str, inventory_limit: int, initial_inventory: int, buy_volume: int, sell_volume: int):
         """
@@ -243,64 +233,14 @@ class Trader:
         
         return round(avail_buy_orders), round(avail_sell_orders)
     
-    def get_current_inventory(self, state: TradingState, product: str, position_changes: int):
+    def pearls_bananas_trade_logic(self, product: str, state: TradingState):
         """
-        Just to clean up the pearls_bananas_trade_logic and make it more readable. This gets the current inventory
-        """
-        
-        initial_inventory = state.position.get(product,0)  
-        current_inventory = initial_inventory + position_changes
-
-        return current_inventory
-    
-    def get_target_inventory(self, product: str):
-        """
-        Updates and returns the target inventory.
-        """
-        upper_bound = self.product_parameters[product]['upper_inventory_limit']
-        lower_bound = self.product_parameters[product]['lower_inventory_limit']
-        target_inventory = (upper_bound + lower_bound) / 2
-
-        return target_inventory
-    
-    def output_data(self, product, state, mod1, mod2, best_bid, mid_price, best_ask, smart_price_bid, smart_price, smart_price_ask):
-        """
-        Print data that is needed for the visualization tool. 
-        """
-        print('\n')
-        time_stamp = state.timestamp
-        order_depth = state.order_depths[product]
-        buy_orders = order_depth.buy_orders
-        sell_orders = order_depth.sell_orders
-        our_previous_filled = state.own_trades.get(product,0)
-        market_previous_filled = state.market_trades.get(product,0)
-        our_position = state.position.get(product,0)
-        #best_bid ;{best_bid}|mid_price;{mid_price}|best_ask;{best_ask}|
-        #print(f"time;{time_stamp}|product;{product}|smart_price_bid;{smart_price_bid}|smart_price;{smart_price}|smart_price_ask;{smart_price_ask}|our_postion;{our_position}| buy_orders;{buy_orders}| sell_orders;{sell_orders}| our_previous_filled;{our_previous_filled}| market_previous_filled;{market_previous_filled}")
-    
-    def calc_allmighty_trend_indicator(self, product: str):
-        """
-        Calculates the available bids/asks for module 2 to adjust in case of huge swings. Currently only works on BANANAS, hence the same
-        """
-        if product == "PUT YOUR PRODUCT HERE":
-            if len(self.product_parameters[product]['smart_price_52_ema']) >= self.look_back_period:
-            
-                current_macd = self.product_parameters[product]['smart_price_macd'][-1]
-            
-                self.product_parameters[product]['upper_inventory_limit'] = max(min(20, 20 + round((current_macd + 0.75) * 50)), 0)
-                self.product_parameters[product]['lower_inventory_limit'] = min(max(-20, -20 + round((current_macd - 0.75) * 50)), 0)
-            else:
-                return
-    
-    def pearls_bananas_trade_logic(self, product:str, state: TradingState, market_variables: list):
-        """
-        Market making logic for Bananas and Pearls only currently. 
+        Market making logic for Bananas and Pearls only. 
         Defining Smart_price, setting a bid/ask from there, clearing all orders in between and pushing all remaining orders to the bid/ask. Works like a charm
         """
         
         #UPDATE INITIAL INVENTORY
         initial_inventory = state.position.get(product,0)
-        
         #DEFINE AND GET ALL NEEDED ORDERBOOK DATA
         (lob_average_buy, 
         lob_average_sell, 
@@ -312,10 +252,7 @@ class Trader:
         lob_sell_volume_per_strike, 
         inventory_limit,
         lob_buy_volume_total,
-        lob_sell_volume_total,
-        best_bid,
-        mid_price,
-        best_ask) = market_variables
+        lob_sell_volume_total) = self.initialize(state, product)
         
         #CHECKS IF THERE ARE ORDERS ON BOTH SIDES OF THE ORDERBOOK
         if lob_buy_volume_total > 0 and lob_sell_volume_total > 0:
@@ -326,14 +263,11 @@ class Trader:
                                                     lob_buy_quantity, 
                                                     lob_sell_quantity)
             
-            #GET PRICE DATA AND CALC VOL
-            self.save_price_data_and_vol(product, smart_price, initial_inventory)
-            
             #CALC BID/ASK
             smart_price_bid, smart_price_ask = self.calculate_bid_ask(product, smart_price, lob_buy_strikes, lob_sell_strikes)
             
-            
             #MOD1 BUY AND SELL ORDERS 
+            
             mod_1_new_orders, mod_1_buy_volume, mod_1_sell_volume = self.module_1_order_tapper(lob_buy_strikes, 
                                                                                                 lob_sell_strikes, 
                                                                                                 lob_buy_volume_per_strike, 
@@ -345,14 +279,9 @@ class Trader:
                                                                                                 smart_price_ask,
                                                                                                 smart_price
                                                                                                 )
-            #ADJUST UPPER AND LOWER LIMIT
-            self.calc_allmighty_trend_indicator(product)
             
             #AVAILABLE BUYS AND SELLS AFTER MOD 1 ORDERS ARE EXECUTED
             avail_buy_orders, avail_sell_orders = self.calculate_available_buy_and_sell(product, inventory_limit, initial_inventory, mod_1_buy_volume, mod_1_sell_volume)
-            
-            #CALCULATE CURRENT INVENTORY WITH MOD 1 ORDERS ALREADY INCLUDED
-            current_inventory = self.get_current_inventory(state, product, (mod_1_buy_volume - mod_1_sell_volume))
             
             #MOD2 BUY AND SELL ORDERS
             mod_2_new_orders = self.module_2_market_maker(smart_price,
@@ -364,12 +293,12 @@ class Trader:
                                                         )
             
             #RETURN ALL ORDER DATA AND THE DATA NEEDED FOR VISUALIZATION
-            return mod_1_new_orders, mod_2_new_orders, best_bid,mid_price, best_ask, smart_price_bid, smart_price, smart_price_ask
+            return mod_1_new_orders, mod_2_new_orders
         
         elif lob_buy_volume_total > 0 and not lob_sell_volume_total > 0:
-            
+            initial_inventory = state.position.get(product, 0)
             ridiculous_sell_order = []
-            avail_buy_orders, avail_sell_orders = self.calculate_available_buy_and_sell(product, inventory_limit, current_inventory, 0, 0)
+            avail_buy_orders, avail_sell_orders = self.calculate_available_buy_and_sell(product, inventory_limit, initial_inventory, 0, 0)
             
             sell_price = round(lob_average_buy * 1.005)
             
@@ -378,9 +307,9 @@ class Trader:
             return ridiculous_sell_order
         
         elif not lob_buy_volume_total > 0 and lob_sell_volume_total > 0:
-            
+            initial_inventory = state.position.get(product, 0)
             ridiculous_buy_order = []
-            avail_buy_orders, avail_sell_orders = self.calculate_available_buy_and_sell(product, inventory_limit, current_inventory, 0, 0)
+            avail_buy_orders, avail_sell_orders = self.calculate_available_buy_and_sell(product, inventory_limit, initial_inventory, 0, 0)
             
             buy_price = round(lob_average_sell * 0.995)
             
@@ -390,6 +319,7 @@ class Trader:
     
     def pina_coco_trade_logic(self, state: TradingState, product_1: str, product_2: str):
         """
+        Stat Arb trade logic for pina coladas and coconut order pair
         Product 2 is always the product which needs to be more expensive. That is how the mean ratio is currently defined.
         If z-Score is positive that means current ratio is bigger than mean. We should then go long in product_1 and short in product_2
         If z-Score is negative that means current ratio is lower than mean. We should then go short in product_1 and long in product_2
@@ -398,7 +328,7 @@ class Trader:
         product_1_orders: list[Order] = []
         product_2_orders: list[Order] = []
         
-        z_score_for_max_orders = 1.5
+        z_score_for_max_orders = 2
         z_score_for_strategy_start = 0.7
         
         pair_key = product_1+"_"+product_2
@@ -513,6 +443,120 @@ class Trader:
         
         return product_1_orders, product_2_orders
     
+    def diving_gear_dolphins_trade_logic (self, state: TradingState, tradable_product: str, observed_product: str):
+        """
+        Trade logic to trade Diving Gear based on the Doplhin sightings reported
+        """
+        current_timestamp  = state.timestamp
+        diving_gear_orders: list[Order] = []
+        current_sightings = state.observations.get(observed_product, 0)
+        last_sigthings = self.product_parameters[observed_product]['last_sightings']
+        position_maximum = self.product_parameters[tradable_product]['inventory_limit']
+        
+        
+        if tradable_product in state.own_trades:
+            last_trade_timestamp = state.own_trades[tradable_product][0].timestamp
+        else:
+            last_trade_timestamp = 0
+        
+        
+        time_since_last_trade = current_timestamp - last_trade_timestamp
+        
+        
+        sighting_spike_initiating_position = 5
+        
+        
+        order_depth_tradable_product: OrderDepth = state.order_depths[tradable_product]
+        initial_position_tradable_product = state.position.get(tradable_product, 0)
+        
+        
+        buy_sell_signal = self.product_parameters[tradable_product]['buy_sell_signal']
+        
+        
+        all_bids_tradable_product = list(reversed(list(order_depth_tradable_product.buy_orders.keys())))
+        all_asks_tradable_product = list(order_depth_tradable_product.sell_orders.keys())
+        bid_volume_tradable_product = list(reversed(list(order_depth_tradable_product.buy_orders.values())))
+        ask_volume_tradable_product = [abs(x) for x in list(order_depth_tradable_product.sell_orders.values())]
+        mid_price_tradable_product = stat.fmean([all_bids_tradable_product[0], all_asks_tradable_product[0]])
+        
+        
+        if len(self.product_parameters[tradable_product]['mid_price_ema']) >= 1 :
+            k = 2 / (self.look_back_period_diving_gear + 1)
+            exp_moving_ave = (mid_price_tradable_product * k) + self.product_parameters[tradable_product]['mid_price_ema'][0] * (1 - k)
+            self.product_parameters[tradable_product]['mid_price_ema'].append(exp_moving_ave)
+            self.product_parameters[tradable_product]['ema_count'] += 100
+            del self.product_parameters[tradable_product]['mid_price_ema'][0]
+        
+        elif len(self.product_parameters[tradable_product]['mid_price_ema']) < 1 :
+            exp_moving_ave = mid_price_tradable_product
+            self.product_parameters[tradable_product]['mid_price_ema'].append(exp_moving_ave)
+        
+        
+        if buy_sell_signal > 0 and self.product_parameters[tradable_product]['mid_price_ema'][0] > (1.0005 * mid_price_tradable_product) and time_since_last_trade > 5000:
+            self.product_parameters[tradable_product]['buy_sell_signal'] = 0
+        elif buy_sell_signal < 0 and self.product_parameters[tradable_product]['mid_price_ema'][0] < (0.9995 * mid_price_tradable_product) and time_since_last_trade > 5000:
+            self.product_parameters[tradable_product]['buy_sell_signal'] = 0
+        
+        
+        if current_timestamp != 0:
+            if last_sigthings != 0: 
+                sightings_difference = current_sightings - last_sigthings
+                if sightings_difference >= sighting_spike_initiating_position:
+                    self.product_parameters[tradable_product]['buy_sell_signal'] = 1
+                    
+                elif sightings_difference <= -sighting_spike_initiating_position:
+                    self.product_parameters[tradable_product]['buy_sell_signal'] = -1
+            else:
+                self.product_parameters[observed_product]['last_sightings'] = current_sightings
+            self.product_parameters[observed_product]['last_sightings'] = current_sightings
+        else:
+            self.product_parameters[observed_product]['last_sightings'] = current_sightings
+        
+        
+        buy_sell_signal = self.product_parameters[tradable_product]['buy_sell_signal']
+        
+        
+        if buy_sell_signal == 1 and initial_position_tradable_product < position_maximum:
+            #buy more until maximum
+            volume_needed = abs(position_maximum - initial_position_tradable_product)
+            volume_filled = 0
+            for idx, strike in enumerate(all_asks_tradable_product):
+                volume = min(ask_volume_tradable_product[idx], (volume_needed - volume_filled))
+                volume_filled += volume
+                diving_gear_orders.append(Order(tradable_product, strike, volume))
+        
+        elif buy_sell_signal == 0 and initial_position_tradable_product > 0:
+            #sell until 0 reached
+            volume_needed = abs(initial_position_tradable_product)
+            volume_filled = 0
+            for idx, strike in enumerate(all_bids_tradable_product):
+                volume = min(bid_volume_tradable_product[idx], (volume_needed - volume_filled))
+                volume_filled += volume
+                diving_gear_orders.append(Order(tradable_product, strike, - volume))
+        
+        elif buy_sell_signal == 0 and initial_position_tradable_product < 0:
+            #buy until 0 reached
+            volume_needed = abs(initial_position_tradable_product)
+            volume_filled = 0
+            for idx, strike in enumerate(all_asks_tradable_product):
+                volume = min(ask_volume_tradable_product[idx], (volume_needed - volume_filled))
+                volume_filled += volume
+                diving_gear_orders.append(Order(tradable_product, strike, volume))
+        
+        elif buy_sell_signal == -1 and initial_position_tradable_product > - position_maximum:
+            #sell until maximum
+            volume_needed = abs(- position_maximum - initial_position_tradable_product)
+            volume_filled = 0
+            for idx, strike in enumerate(all_bids_tradable_product):
+                volume = min(bid_volume_tradable_product[idx], (volume_needed - volume_filled))
+                volume_filled += volume
+                diving_gear_orders.append(Order(tradable_product, strike, - volume))
+        
+        
+        
+        return diving_gear_orders
+        
+    
     def run(self, state: TradingState) -> Dict[str, List[Order]]:
         """
         Takes all buy and sell orders for all symbols as an input,
@@ -525,22 +569,15 @@ class Trader:
         #MARKET MAKING 
         #ITERATE OVER ALL AVAILABLE PRODUCTS IN THE ORDER DEPTHS
         for product in state.order_depths.keys():
-            if product in ['PEARLS','BANANAS']:
-                #DEFINE AND GET ALL ORDER BOOK DATA
-                market_variables = self.initialize(state, product)
+            if product in ['PEARLS','BANANAS', 'BERRIES']:
                 
                 #EXECUTE THE TRADE LOGIC AND OUTPUTS ALL ORDERS + DATA NEEDED FOR VISUALIZATION
-                mod1, mod2, best_bid, mid_price, best_ask, smart_price_bid, smart_price, smart_price_ask = self.pearls_bananas_trade_logic(product, state, market_variables)
+                module_1_orders, module_2_orders = self.pearls_bananas_trade_logic(product, state)
                 
                 #ADDS ALL ORDERS TO BE TRANSMITTED TO THE EMPTY DICT
-                total_transmittable_orders[product] = mod1 + mod2
-                
-                #PRINTS THE OUTPUT DATA NEEDED FOR VISUALIZATION
-                # self.output_data(product, state, mod1, mod2, best_bid, mid_price, best_ask, smart_price_bid, smart_price, smart_price_ask) 
+                total_transmittable_orders[product] = module_1_orders + module_2_orders
             
             
-        
-        
         #STATS ARBITRAGE
         if 'PINA_COLADAS' in state.order_depths.keys() and 'COCONUTS' in state.order_depths.keys():
             product_1_orders, product_2_orders = self.pina_coco_trade_logic(state, 'COCONUTS', 'PINA_COLADAS')
@@ -548,7 +585,11 @@ class Trader:
             total_transmittable_orders['COCONUTS'] = product_1_orders
             total_transmittable_orders['PINA_COLADAS'] = product_2_orders
         
-        
+        if 'DIVING_GEAR' in state.order_depths.keys() and 'DOLPHIN_SIGHTINGS' in state.observations.keys():
+            
+            diving_gear_orders = self.diving_gear_dolphins_trade_logic(state, 'DIVING_GEAR', 'DOLPHIN_SIGHTINGS')
+            
+            total_transmittable_orders['DIVING_GEAR'] = diving_gear_orders
         
         
         #RETURNS ALL ORDER DATA TO THE ENGINE
