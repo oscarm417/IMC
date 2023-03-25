@@ -585,6 +585,8 @@ class Trader:
             total_transmittable_orders['COCONUTS'] = product_1_orders
             total_transmittable_orders['PINA_COLADAS'] = product_2_orders
         
+        
+        #All-In Wombo-Combo
         if 'DIVING_GEAR' in state.order_depths.keys() and 'DOLPHIN_SIGHTINGS' in state.observations.keys():
             
             diving_gear_orders = self.diving_gear_dolphins_trade_logic(state, 'DIVING_GEAR', 'DOLPHIN_SIGHTINGS')
