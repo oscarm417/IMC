@@ -230,29 +230,69 @@ class Trader:
                 lob_sell_strikes, lob_buy_volume_per_strike, lob_sell_volume_per_strike, inventory_limit,
                 lob_buy_volume_total, lob_sell_volume_total,best_bid,mid_price,best_ask)
     
+    def adjust_berry_bid(self, product: str,timestamp: int):
+        timestamp_percent = (timestamp/1000000)
+        timestamp = timestamp/100
+        current_upper = self.product_parameters[product]['upper_inventory_limit']
+        current_lower = self.product_parameters[product]['lower_inventory_limit']
+        
+        if timestamp <= 2000:
+            lower_increment = timestamp*(250/2000)
+            current_lower = -250 + lower_increment
+            self.product_parameters[product]['upper_inventory_limit'] = 250
+            self.product_parameters[product]['lower_inventory_limit'] = current_lower #going towards zero 
+
+        elif 2000< timestamp <= 2500 :
+            lower_increment = (timestamp-2000)*(250/500)
+            current_lower = 0 + lower_increment
+            self.product_parameters[product]['upper_inventory_limit'] = 250
+            self.product_parameters[product]['lower_inventory_limit'] = current_lower #going towards 250 
+        
+        elif 2500 < timestamp <= 4800 :
+            self.product_parameters[product]['upper_inventory_limit'] = 250 #Full long
+            self.product_parameters[product]['lower_inventory_limit'] = 250 #Full long
+
+        elif 4800 < timestamp <= 4900 :
+            lower_increment = (timestamp-4800)*(250/100)
+            current_lower = 250 + -lower_increment  
+            self.product_parameters[product]['upper_inventory_limit'] = 250
+            self.product_parameters[product]['lower_inventory_limit'] = current_lower #go towards 0
+        
+        elif 4900 < timestamp <= 5100 :  
+            increment = (timestamp-4900)*(250/200)
+            current_upper = 250 - increment 
+            current_lower = 0 - increment
+            self.product_parameters[product]['upper_inventory_limit'] = current_upper #go twoards 0
+            self.product_parameters[product]['lower_inventory_limit'] = current_lower #go towards -250
+
+        elif 5100 < timestamp <= 5200 : #full short 
+            increment = (timestamp-5100)*(250/100)
+            current_upper = 0 - increment
+            self.product_parameters[product]['upper_inventory_limit'] = current_upper #go towards -250 
+            self.product_parameters[product]['lower_inventory_limit'] = -250
+
+        elif 5200 < timestamp <= 5300 :#Full short
+            self.product_parameters[product]['upper_inventory_limit'] = -250
+            self.product_parameters[product]['lower_inventory_limit'] = -250
+        
+        # elif 5300 < timestamp <= 5300 :#Full short
+        elif 7000 < timestamp:
+            self.product_parameters[product]['upper_inventory_limit'] = 250
+            self.product_parameters[product]['lower_inventory_limit'] = -250
+
+            
+
     def calculate_available_buy_and_sell(self, product: str, inventory_limit: int, initial_inventory: int, buy_volume: int, sell_volume: int,timestamp: int):
         """
         Calculates the buy and sell orders still available taking the module 1 orders into account
         """
         
         if product == 'BERRIES':
-            timestamp = (timestamp/100)%10000
-            print(product,timestamp)
-            if 0 < timestamp < 2500: 
-                self.product_parameters[product]['upper_inventory_limit'] = 250
-                self.product_parameters[product]['lower_inventory_limit'] = -250
-            elif 2500<= timestamp <= 5000:
-                self.product_parameters[product]['upper_inventory_limit'] = 250
-                self.product_parameters[product]['lower_inventory_limit'] = 250
-            elif 5000<timestamp<= 7500:
-                self.product_parameters[product]['upper_inventory_limit'] = -250
-                self.product_parameters[product]['lower_inventory_limit'] = -250
-            elif 7500<=timestamp:
-                self.product_parameters[product]['upper_inventory_limit'] = 250
-                self.product_parameters[product]['lower_inventory_limit'] = -250
+            self.adjust_berry_bid(product,timestamp)
         
         upper_bound = self.product_parameters[product]['upper_inventory_limit']
         lower_bound = self.product_parameters[product]['lower_inventory_limit']
+        print(lower_bound,upper_bound)
 
         if min(upper_bound,inventory_limit) - initial_inventory - buy_volume < 0:
             avail_buy_orders = 0
@@ -324,6 +364,7 @@ class Trader:
         
         #UPDATE INITIAL INVENTORY
         initial_inventory = state.position.get(product,0)
+     
         
         #DEFINE AND GET ALL NEEDED ORDERBOOK DATA
         (lob_average_buy, 
@@ -340,6 +381,8 @@ class Trader:
         best_bid,
         mid_price,
         best_ask) = market_variables
+        if product == 'BERRIES':
+            print(best_bid,mid_price,best_ask)
         
         #CHECKS IF THERE ARE ORDERS ON BOTH SIDES OF THE ORDERBOOK
         if lob_buy_volume_total > 0 and lob_sell_volume_total > 0:
