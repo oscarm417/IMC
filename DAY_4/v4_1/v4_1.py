@@ -485,12 +485,11 @@ class Trader:
         time_since_last_trade = current_timestamp - last_trade_timestamp
         
         
-        sighting_spike_initiating_position = 5
+        sighting_spike_initiating_position = 6
         
         
         order_depth_tradable_product: OrderDepth = state.order_depths[tradable_product]
         initial_position_tradable_product = state.position.get(tradable_product, 0)
-        
         
         
         all_bids_tradable_product = list(reversed(list(order_depth_tradable_product.buy_orders.keys())))
@@ -501,7 +500,6 @@ class Trader:
         
         if time_since_last_trade > 78000:
             self.product_parameters[tradable_product]['buy_sell_signal'] = 0
-        
         
         if current_timestamp != 0:
             if last_sigthings != 0: 
