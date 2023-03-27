@@ -46,7 +46,7 @@ class Trader:
             "COCONUTS_PINA_COLADAS":{'mean_ratio': 1.875, 'stdev_ratio': 0.00447052512964639, 'mean_ratio_backtest': 1.874649044228040, 'stdev_ratio_backtest': 0.0014590944891508,
                                     'coconuts_order_minimum': 15, 'pina_coladas_order_minimum': 8, 'trade_opportunities': 37}
         }
-        self.look_back_period_diving_gear = 500 #use float('inf') if you dont want this used
+        
     
     def module_1_order_tapper(self, lob_buy_strikes, lob_sell_strikes, lob_buy_volume_per_strike, lob_sell_volume_per_strike, initial_inventory, inventory_limit, product, new_bid, new_ask, timestamp):
         """
