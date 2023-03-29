@@ -1123,7 +1123,6 @@ day;timestamp;buyer;seller;currency;price;quantity
 -2;3903.0;Camilla;Paris;SEASHELLS;4983.0;1
 -2;3905.0;Charlie;Paris;SEASHELLS;4982.0;1
 -2;3905.0;Charlie;Gary;SEASHELLS;4982.0;20
--2;3905.0;Charlie;Paris;SEASHELLS;0.0;2
 -2;3906.0;Paris;Charlie;SEASHELLS;4988.0;1
 -2;3911.0;Paris;Charlie;SEASHELLS;4988.0;1
 -2;3912.0;Charlie;Gary;SEASHELLS;4983.0;15
