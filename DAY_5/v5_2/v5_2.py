@@ -240,11 +240,7 @@ class Trader:
                 if long == False and short == False:
                     self.product_parameters[product]['upper_inventory_limit'] = 20
                     self.product_parameters[product]['lower_inventory_limit'] = -20
-
-
-
-
-        
+    
     def calculate_available_buy_and_sell(self,state, product: str, inventory_limit: int, initial_inventory: int, buy_volume: int, sell_volume: int, timestamp: int):
         """
         Calculates the buy and sell orders still available taking the module 1 orders into account
@@ -252,8 +248,8 @@ class Trader:
         
         if product == 'BERRIES':
             self.adjust_berry_limits(state,product, timestamp)
-        if product == 'BANANAS':
-            self.adjust_bananas_limits(state,product)
+        #if product == 'BANANAS':
+        #    self.adjust_bananas_limits(state,product)
         
         upper_bound = self.product_parameters[product]['upper_inventory_limit']
         lower_bound = self.product_parameters[product]['lower_inventory_limit']
